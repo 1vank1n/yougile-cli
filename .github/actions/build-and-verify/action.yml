@@ -116,5 +116,9 @@ runs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.artifact-name }}
-        path: dist/*
+        # Only the distributions: `dist/*` would also pick up the `.gitignore`
+        # uv leaves in the build directory.
+        path: |
+          dist/*.whl
+          dist/*.tar.gz
         if-no-files-found: error

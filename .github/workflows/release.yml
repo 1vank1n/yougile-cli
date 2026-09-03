@@ -44,5 +44,9 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          # Not `dist/*`: uv leaves a `.gitignore` in the build directory, and the
+          # action's globber matches dotfiles, so it shipped as `default.gitignore`.
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
           generate_release_notes: true
