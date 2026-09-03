@@ -1,4 +1,4 @@
-"""Метаданные упаковки: заявленные зависимости и то, что pyproject обещает дистрибутиву."""
+"""Метаданные упаковки: зависимости, обещания pyproject дистрибутиву и релизный workflow."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 # 0.26 — первый typer с вендоренным click (`typer._click`), который патчит i18n;
 # на 0.12–0.13 приложение вообще не собирается, на 0.13–0.25 интерфейс английский.
@@ -99,3 +100,71 @@ def test_sdist_include_keeps_the_required_minimum_and_matches_the_repository() -
     assert not missing, f"выпали из include: {missing}"
     for entry in include:
         assert (ROOT / entry.lstrip("/")).exists(), f"{entry} в include, но нет в репозитории"
+
+
+# Публикующий action PyPA — единственный поддерживаемый способ Trusted Publishing;
+# по нему и опознаётся публикующий job, чтобы тест не зависел от его имени.
+PYPI_PUBLISH_ACTION = "pypa/gh-action-pypi-publish"
+
+
+def _release_workflow() -> dict[str, Any]:
+    workflow = ROOT / ".github" / "workflows" / "release.yml"
+    if not workflow.exists():  # pragma: no cover - установленный пакет без исходников
+        pytest.skip("нет .github/workflows/release.yml")
+    data: dict[str, Any] = yaml.safe_load(workflow.read_text(encoding="utf-8"))
+    return data
+
+
+def _steps(job: dict[str, Any]) -> list[dict[str, Any]]:
+    return list(job.get("steps") or [])
+
+
+def _uses(job: dict[str, Any], needle: str) -> list[dict[str, Any]]:
+    return [step for step in _steps(job) if needle in str(step.get("uses", ""))]
+
+
+def _runs(job: dict[str, Any], needle: str) -> list[dict[str, Any]]:
+    return [step for step in _steps(job) if needle in str(step.get("run", ""))]
+
+
+def test_release_publishes_to_pypi_after_the_release_job_and_without_a_password() -> None:
+    jobs = _release_workflow()["jobs"]
+    publishing = {name: job for name, job in jobs.items() if _uses(job, PYPI_PUBLISH_ACTION)}
+    assert list(publishing) and len(publishing) == 1, (
+        f"ожидался ровно один публикующий job: {list(publishing)}"
+    )
+    job = next(iter(publishing.values()))
+
+    needs = job.get("needs") or []
+    if isinstance(needs, str):
+        needs = [needs]
+    assert needs, "публикация без needs стартует параллельно проверкам и заливает непроверенное"
+    for dependency in needs:
+        assert dependency in jobs, f"needs ссылается на несуществующий job {dependency}"
+
+    permissions = job.get("permissions") or {}
+    assert permissions.get("id-token") == "write", "без id-token: write OIDC не выдаст токен PyPI"
+    assert "contents" not in permissions, "публикующему job'у нечего писать в репозиторий"
+
+    text = yaml.safe_dump(job, allow_unicode=True)
+    for forbidden in ("password", "secrets.", "PYPI_API_TOKEN"):
+        assert forbidden not in text, (
+            f"в публикующем job'е появился {forbidden}: аутентификация только по OIDC"
+        )
+
+    publish_step = _uses(job, PYPI_PUBLISH_ACTION)[0]
+    assert (publish_step.get("with") or {}).get("skip-existing") is True, (
+        "без skip-existing перезапуск релиза на залитой версии красит workflow"
+    )
+
+    assert _uses(job, "download-artifact"), (
+        "публикуются артефакты сборки, а не пересобранные заново"
+    )
+    assert not _uses(job, "build-and-verify")
+    assert not _runs(job, "uv build")
+
+    gate = jobs[needs[0]]
+    build = _uses(gate, "build-and-verify")[0]
+    assert (build.get("with") or {}).get("artifact-name"), (
+        "релизный job обязан выгрузить dist, иначе публикующему нечего скачивать"
+    )

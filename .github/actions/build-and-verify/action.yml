@@ -1,8 +1,9 @@
 name: Build and verify distribution
 description: >
-  Builds the wheel and sdist, checks what actually landed inside them, installs
-  the wheel into a clean venv and runs the console scripts with an isolated
-  config directory. Requires uv and python3 (>= 3.11, for tomllib) on PATH.
+  Builds the wheel and sdist, checks what actually landed inside them and how
+  their metadata renders, installs the wheel into a clean venv and runs the
+  console scripts with an isolated config directory. Requires uv (with uvx)
+  and python3 (>= 3.11, for tomllib) on PATH.
 
 inputs:
   artifact-name:
@@ -89,6 +90,15 @@ runs:
             sys.exit(1)
         print("artifact contents OK")
         PY
+
+    - name: Check distribution metadata
+      shell: bash
+      run: |
+        set -euo pipefail
+        # What PyPI shows on the project page: the long_description type and its
+        # validity. Run ephemerally so twine stays out of the project's dependencies.
+        # `dist/*` misses the .gitignore uv leaves here — bash does not glob dotfiles.
+        uvx twine check --strict dist/*
 
     - name: Smoke test the built wheel
       id: smoke
