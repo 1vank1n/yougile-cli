@@ -7,6 +7,41 @@
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-09-03
+
+### Как обновиться
+
+```bash
+uv tool install --force yougile-cli
+# pipx install --force yougile-cli   ·   pip install -U yougile-cli
+```
+
+Это первый релиз, доступный на PyPI: команды выше ставят пакет прямо оттуда,
+без git-ссылки и без установленного git. Поведение самого CLI не менялось ни
+на байт, ломающих изменений нет.
+
+### Добавлено
+
+- Пакет публикуется на PyPI — `pip install yougile-cli` и
+  `uv tool install yougile-cli` работают без git-ссылки.
+- Публикация автоматическая: релизный workflow по тегу `v*` собирает колесо и
+  sdist, сверяет версию в колесе с тегом, проверяет метаданные дистрибутива,
+  гоняет линтер, типы и тесты, создаёт GitHub-релиз и заливает те же
+  артефакты на PyPI. Аутентификация — Trusted Publishing по OIDC, токена PyPI
+  в репозитории нет.
+
+### Исправлено
+
+- Относительные ссылки в README заменены на абсолютные: PyPI разрешает
+  ссылки описания относительно `pypi.org`, и без этого они вели бы в 404. В
+  метаданные добавлена ссылка на changelog.
+
+### Документация
+
+- README предлагает установку из PyPI первой; git-ссылка осталась ниже как
+  способ поставить неопубликованную версию с `main`. В CONTRIBUTING появился
+  раздел «Релиз» с шагами выпуска и разовой настройкой на pypi.org.
+
 ## [0.2.0] — 2026-09-03
 
 ### Как обновиться
@@ -170,6 +205,7 @@ uv tool install --force yougile-cli
 [#8]: https://github.com/1vank1n/yougile-cli/issues/8
 [#9]: https://github.com/1vank1n/yougile-cli/issues/9
 [#10]: https://github.com/1vank1n/yougile-cli/issues/10
-[Unreleased]: https://github.com/1vank1n/yougile-cli/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/1vank1n/yougile-cli/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/1vank1n/yougile-cli/releases/tag/v0.2.1
 [0.2.0]: https://github.com/1vank1n/yougile-cli/releases/tag/v0.2.0
 [0.1.0]: https://github.com/1vank1n/yougile-cli/releases/tag/v0.1.0
