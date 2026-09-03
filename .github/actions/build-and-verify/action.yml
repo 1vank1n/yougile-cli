@@ -1,0 +1,120 @@
+name: Build and verify distribution
+description: >
+  Builds the wheel and sdist, checks what actually landed inside them, installs
+  the wheel into a clean venv and runs the console scripts with an isolated
+  config directory. Requires uv and python3 (>= 3.11, for tomllib) on PATH.
+
+inputs:
+  artifact-name:
+    description: Name of the uploaded dist artifact. An empty string skips the upload.
+    required: false
+    default: dist
+
+outputs:
+  version:
+    description: Version of the installed distribution, read from its metadata.
+    value: ${{ steps.smoke.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Build wheel and sdist
+      shell: bash
+      run: |
+        set -euo pipefail
+        rm -rf dist
+        uv build
+        echo "--- dist ---"
+        ls -l dist
+
+    - name: Check artifact contents
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        import glob
+        import sys
+        import tarfile
+        import tomllib
+        import zipfile
+        from pathlib import Path
+
+        failures: list[str] = []
+
+        wheels = sorted(glob.glob("dist/*.whl"))
+        sdists = sorted(glob.glob("dist/*.tar.gz"))
+        if len(wheels) != 1:
+            failures.append(f"expected exactly one wheel in dist/, found {wheels}")
+        if len(sdists) != 1:
+            failures.append(f"expected exactly one sdist in dist/, found {sdists}")
+
+        if wheels:
+            with zipfile.ZipFile(wheels[0]) as wheel:
+                names = wheel.namelist()
+            print(f"--- {wheels[0]} ---")
+            for name in names:
+                print(f"  {name}")
+            # `uv build` exits 0 on a wheel that holds nothing but dist-info, so the
+            # package modules have to be asserted explicitly.
+            modules = [n for n in names if n.startswith("yougile_cli/") and n.endswith(".py")]
+            if not modules:
+                failures.append("wheel contains no yougile_cli/*.py modules, only dist-info")
+            if "yougile_cli/py.typed" not in names:
+                failures.append("wheel is missing yougile_cli/py.typed")
+
+        if sdists:
+            with tarfile.open(sdists[0]) as sdist:
+                entries = sdist.getnames()
+            print(f"--- {sdists[0]} ---")
+            for entry in entries:
+                print(f"  {entry}")
+            # Half of a pair: this asserts that everything `include` declares really
+            # landed in the archive, while
+            # tests/test_packaging.py::test_sdist_include_keeps_the_required_minimum_and_matches_the_repository
+            # asserts that `include` still declares the required minimum. Dropping
+            # either half lets an entry disappear from the sdist unnoticed.
+            # Every entry is prefixed with the `<name>-<version>/` root directory.
+            inside = {e.split("/", 1)[1] for e in entries if "/" in e}
+            declared = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+            include = declared["tool"]["hatch"]["build"]["targets"]["sdist"]["include"]
+            expected = {item.lstrip("/") for item in include}
+            expected |= {"src/yougile_cli/__init__.py", "tests"}
+            for item in sorted(expected):
+                if item not in inside and not any(e.startswith(item + "/") for e in inside):
+                    failures.append(f"sdist is missing {item}")
+
+        if failures:
+            for failure in failures:
+                print(f"FAIL: {failure}", file=sys.stderr)
+            sys.exit(1)
+        print("artifact contents OK")
+        PY
+
+    - name: Smoke test the built wheel
+      id: smoke
+      shell: bash
+      run: |
+        set -euo pipefail
+        venv="${RUNNER_TEMP:-/tmp}/wheel-check"
+        rm -rf "$venv"
+        python3 -m venv "$venv"
+        "$venv/bin/pip" install --quiet --upgrade pip
+        "$venv/bin/pip" install --quiet dist/*.whl
+        reported="$(YOUGILE_CONFIG_DIR="$(mktemp -d)" "$venv/bin/yougile" --version)"
+        echo "installed wheel reports: $reported"
+        YOUGILE_CONFIG_DIR="$(mktemp -d)" "$venv/bin/yg" --help > /dev/null
+        echo "yg --help OK"
+        # The release gate compares the tag against this value, so it is read from the
+        # distribution metadata rather than parsed out of the human-readable
+        # `yougile --version` line, whose wording is free to change.
+        version="$("$venv/bin/python" -c 'import importlib.metadata as m; print(m.version("yougile-cli"))')"
+        echo "installed distribution metadata version: $version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+    - name: Upload distributions
+      if: inputs.artifact-name != ''
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: dist/*
+        if-no-files-found: error

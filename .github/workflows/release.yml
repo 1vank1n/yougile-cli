@@ -16,25 +16,31 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --extra dev
-      - name: Tag matches package version
+      # The build runs first so the tag is compared against the version baked into
+      # the wheel, not against the source tree the wheel is merely derived from.
+      # `files: dist/*` below already publishes these artifacts, so no upload here.
+      - name: Build and verify distribution
+        id: dist
+        uses: ./.github/actions/build-and-verify
+        with:
+          artifact-name: ""
+      - name: Tag matches the version in the built wheel
+        env:
+          WHEEL_VERSION: ${{ steps.dist.outputs.version }}
         run: |
           tag="${GITHUB_REF_NAME#v}"
-          version="$(uv run python -c 'import yougile_cli; print(yougile_cli.__version__)')"
-          if [ "$tag" != "$version" ]; then
-            echo "tag $GITHUB_REF_NAME does not match version $version" >&2
+          if [ -z "$WHEEL_VERSION" ]; then
+            echo "the built wheel reported no version" >&2
+            exit 1
+          fi
+          if [ "$tag" != "$WHEEL_VERSION" ]; then
+            echo "tag $GITHUB_REF_NAME does not match wheel version $WHEEL_VERSION" >&2
             exit 1
           fi
       - run: uv run ruff check src tests
       - run: uv run ruff format --check src tests
       - run: uv run mypy src
       - run: uv run pytest -q
-      - run: uv build
-      - name: Smoke test the built wheel
-        run: |
-          python -m venv /tmp/relcheck
-          /tmp/relcheck/bin/pip install --quiet dist/*.whl
-          YOUGILE_CONFIG_DIR="$(mktemp -d)" /tmp/relcheck/bin/yougile --version
-          YOUGILE_CONFIG_DIR="$(mktemp -d)" /tmp/relcheck/bin/yg --help
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
