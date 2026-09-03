@@ -52,6 +52,7 @@ __all__ = [
     "render",
     "render_table",
     "run_jq",
+    "sanitize_terminal_text",
     "select_fields",
     "shorten_id",
     "shorten_ids",
@@ -71,6 +72,19 @@ _UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
 _TS_KEYS = ("deadline", "lastactivity", "since", "atmoment")
+
+# ESC plus the rest of C0 (tab and newline stay: they are handled by the callers) and C1.
+_CONTROL_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x80-\x9f]")
+_PLACEHOLDER = "\ufffd"
+
+
+def sanitize_terminal_text(text: str) -> str:
+    """Server text is data, not commands: no escape sequence may reach the terminal.
+
+    Each stripped character becomes U+FFFD so the user can tell a plain title from
+    one that carried something invisible.
+    """
+    return _CONTROL_RE.sub(_PLACEHOLDER, text)
 
 
 class OutputFormat(StrEnum):
@@ -216,7 +230,7 @@ def compact(value: Any, limit: int = 60) -> str:
         text = json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=str)
     else:
         text = str(value)
-    text = text.replace("\n", " ").replace("\t", " ").strip()
+    text = sanitize_terminal_text(text).replace("\n", " ").replace("\t", " ").strip()
     if limit and len(text) > limit:
         text = text[: limit - 1] + "…"
     return text
@@ -355,7 +369,14 @@ def run_jq(data: Any, expr: str) -> str:
 
 
 def _write(console: Console, line: str, *, style: str | None = None) -> None:
-    console.print(line, style=style, markup=False, highlight=False, overflow="ignore", crop=False)
+    console.print(
+        sanitize_terminal_text(line),
+        style=style,
+        markup=False,
+        highlight=False,
+        overflow="ignore",
+        crop=False,
+    )
 
 
 def notify_empty(console: Console | None = None, message: str = EMPTY_NOTICE) -> None:
@@ -415,11 +436,18 @@ def print_kv(
         _write(out, f"{key.ljust(width)}  {text}")
 
 
-FORMULA_STARTERS = ("=", "+", "-", "@", "\t", "\r")
+# `\r` is absent on purpose: _sanitize_cell turns it into U+FFFD before this check,
+# so a CR branch here would be dead. `\t` survives sanitising and still needs it.
+FORMULA_STARTERS = ("=", "+", "-", "@", "\t")
+
+
+def _sanitize_cell(value: Any) -> Any:
+    """`csv`/`tsv` land in files a shell later `cat`s: ESC must not survive the trip."""
+    return sanitize_terminal_text(value) if isinstance(value, str) else value
 
 
 def _defuse_formula(value: Any) -> Any:
-    """Spreadsheets evaluate a cell that starts with =, +, -, @ or a control char."""
+    """Spreadsheets evaluate a cell that starts with =, +, -, @ or a tab."""
     if isinstance(value, str) and value.startswith(FORMULA_STARTERS):
         return "'" + value
     return value
@@ -430,10 +458,13 @@ def _write_delimited(rows: list[dict[str, Any]], delimiter: str, columns: list[s
     headers = columns or available_fields(flat_rows)
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=delimiter, lineterminator="\n")
-    writer.writerow(headers)
+    writer.writerow([_sanitize_cell(h) for h in headers])
     for row in flat_rows:
         writer.writerow(
-            ["" if row.get(h) is None else _defuse_formula(row.get(h)) for h in headers]
+            [
+                "" if row.get(h) is None else _defuse_formula(_sanitize_cell(row.get(h)))
+                for h in headers
+            ]
         )
     return buffer.getvalue()
 

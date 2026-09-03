@@ -35,7 +35,7 @@ from ..editor import open_editor
 from ..errors import CancelledError, ValidationError, YouGileError, not_specified_message
 from ..htmltext import html_to_text
 from ..output import is_tty as _is_tty
-from ..output import shorten_id, target_label
+from ..output import sanitize_terminal_text, shorten_id, target_label
 from ..resolve import (
     parse_kv_options,
     resolve_board_id,
@@ -741,7 +741,7 @@ def _print_description(app_ctx: AppContext, task: dict[str, Any], *, raw: bool) 
     if not text or app_ctx.quiet:
         return
     app_ctx.console.print("\nОПИСАНИЕ", style="bold", markup=False, highlight=False)
-    for line in text.split("\n"):
+    for line in sanitize_terminal_text(text).split("\n"):
         app_ctx.console.print(f"  {line}".rstrip(), markup=False, highlight=False)
 
 
@@ -752,7 +752,9 @@ def _print_attachments(app_ctx: AppContext, attachments: list[Attachment]) -> No
     width = max(len(item.source) for item in attachments)
     for item in attachments:
         app_ctx.console.print(
-            f"  {item.source.ljust(width)}  {item.name}  {strip_preview(item.url)}",
+            sanitize_terminal_text(
+                f"  {item.source.ljust(width)}  {item.name}  {strip_preview(item.url)}"
+            ),
             markup=False,
             highlight=False,
         )
@@ -764,7 +766,11 @@ def _print_checklists(app_ctx: AppContext, task: dict[str, Any]) -> None:
         return
     app_ctx.console.print("\nЧЕК-ЛИСТЫ", style="bold", markup=False, highlight=False)
     for checklist in checklists:
-        app_ctx.console.print(f"  {checklist.get('title') or ''}", markup=False, highlight=False)
+        app_ctx.console.print(
+            sanitize_terminal_text(f"  {checklist.get('title') or ''}"),
+            markup=False,
+            highlight=False,
+        )
         items = checklist.get("items")
         entries = items if isinstance(items, list) else [items] if items else []
         for entry in entries:
@@ -772,7 +778,9 @@ def _print_checklists(app_ctx: AppContext, task: dict[str, Any]) -> None:
                 continue
             mark = "x" if entry.get("isCompleted") else " "
             app_ctx.console.print(
-                f"    [{mark}] {entry.get('title') or ''}", markup=False, highlight=False
+                sanitize_terminal_text(f"    [{mark}] {entry.get('title') or ''}"),
+                markup=False,
+                highlight=False,
             )
 
 
@@ -793,7 +801,9 @@ def _print_subtasks(app_ctx: AppContext, task: dict[str, Any]) -> None:
             completed = bool(child.get("completed"))
         mark = "x" if completed else " "
         app_ctx.console.print(
-            f"  [{mark}] {shorten_id(subtask_id, full=app_ctx.out.full_ids)}  {title}",
+            sanitize_terminal_text(
+                f"  [{mark}] {shorten_id(subtask_id, full=app_ctx.out.full_ids)}  {title}"
+            ),
             markup=False,
             highlight=False,
         )

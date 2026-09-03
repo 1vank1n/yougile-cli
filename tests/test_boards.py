@@ -143,7 +143,8 @@ def test_view_ambiguous_name_fails(api: Any, paged: Any, run: Any) -> None:
     api.get("/api-v2/boards").respond(json=paged([BOARD, {**BOARD, "id": OTHER_BOARD_ID}]))
     result = run(["view", "Спринт"])
     assert isinstance(result.exception, ResolveError)
-    assert code(result) == 2
+    # Неоднозначное имя — ошибка выполнения, а не вызова (issue #9).
+    assert code(result) == 1
 
 
 def test_view_missing_board_is_not_found(api: Any, run: Any) -> None:
@@ -412,5 +413,23 @@ def test_missing_board_name_is_feminine(api: Any, paged: Any, run: Any) -> None:
 def test_ambiguous_board_name_uses_plural_genitive(api: Any, paged: Any, run: Any) -> None:
     api.get("/api-v2/boards").respond(json=paged([BOARD, {**BOARD, "id": OTHER_BOARD_ID}]))
     result = run(["view", "Спринт"])
-    assert code(result) == 2
+    assert code(result) == 1
     assert "Найдено несколько (2) досок с именем «Спринт»." in str(result.exception)
+
+
+ESCAPE_ATTACK = "Задача\x1b]52;c;aGFjaw==\x1b\\\x1b[2J\x1b[31mFAKE"
+
+
+def test_tree_strips_escape_sequences_from_titles(api: Any, paged: Any, run: Any) -> None:
+    """Названия узлов дерева приходят с сервера (issue #1)."""
+    api.get(f"/api-v2/boards/{BOARD_ID}").respond(json={**BOARD, "title": ESCAPE_ATTACK})
+    api.get("/api-v2/columns").respond(
+        json=paged([{"id": COLUMN_A, "title": ESCAPE_ATTACK, "boardId": BOARD_ID}])
+    )
+    api.get("/api-v2/task-list").respond(
+        json=paged([{"id": TASK_A, "title": ESCAPE_ATTACK, "completed": False}])
+    )
+    result = run(["tree", BOARD_ID])
+    assert code(result) == 0, result.output
+    assert "\x1b" not in result.output
+    assert "�" in result.stdout

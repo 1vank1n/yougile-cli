@@ -238,7 +238,7 @@ def test_ambiguous_state_name(run: Any, api: respx.MockRouter) -> None:
     )
     result = run(["sticker", "string", "state", "delete", SID, "Дубль", "-y"])
     assert isinstance(result.exception, AmbiguousNameError)
-    assert exit_code_for(result.exception) == 2
+    assert exit_code_for(result.exception) == 1
 
 
 # --------------------------------------------------------------------------- sprint

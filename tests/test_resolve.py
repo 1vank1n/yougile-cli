@@ -148,7 +148,7 @@ def test_resolve_ambiguous_lists_candidates(
     )
     with pytest.raises(AmbiguousNameError) as excinfo:
         resolve_project_id(client, "Ремонт")
-    assert excinfo.value.exit_code == 2
+    assert excinfo.value.exit_code == 1
     assert {c["id"] for c in excinfo.value.candidates} == {"p1", "p2"}
 
 
@@ -498,3 +498,21 @@ def test_task_cache_is_private_to_the_account(
     cache = isolated_config / "cache"
     assert len(sorted(cache.glob("tasks-yougile.com-*.json"))) == 2
     assert account_tag("key-a") != account_tag("key-b")
+
+
+def test_board_view_ambiguous_name_is_a_runtime_error(
+    run: Any, api: respx.MockRouter, paged: Any
+) -> None:
+    """Неоднозначное имя — ошибка выполнения (код 1), список кандидатов остаётся."""
+    api.get("/api-v2/boards").respond(
+        json=paged(
+            [
+                {"id": "b1", "title": "Дубль", "projectId": "p1"},
+                {"id": "b2", "title": "Дубль", "projectId": "p2"},
+            ]
+        )
+    )
+    result = run(["board", "view", "Дубль"])
+    assert result.exit_code == 1
+    assert "b1" in result.output
+    assert "b2" in result.output

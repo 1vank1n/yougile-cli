@@ -369,11 +369,19 @@ def test_config_set_rejects_bad_prompt(invoke: Callable[..., Any]) -> None:
 
 
 def test_config_list(invoke: Callable[..., Any]) -> None:
-    invoke("config set pager less")
+    invoke("config set output json")
     result = invoke("config list")
     assert code(result) == 0
-    assert "pager" in result.stdout
-    assert "less" in result.stdout
+    assert "output" in result.stdout
+    assert "json" in result.stdout
+    assert "pager" not in result.stdout
+
+
+def test_config_set_rejects_the_removed_pager_key(invoke: Callable[..., Any]) -> None:
+    result = invoke("config set pager less")
+    assert isinstance(result.exception, ValidationError)
+    assert code(result) == 2
+    assert "Неизвестная настройка" in str(result.exception)
 
 
 def test_config_clear_cache(invoke: Callable[..., Any], isolated_config: Path) -> None:
@@ -726,3 +734,35 @@ def test_every_metavar_is_russian_and_uppercase() -> None:
             assert word in ALLOWED_LATIN_METAVARS, f"{where}: латинский метавар «{metavar}»"
         checked += 1
     assert checked > 10
+
+
+ESCAPE_ATTACK = "Имя\x1b]52;c;aGFjaw==\x1b\\\x1b[2J\x1b[31mFAKE"
+# Ожидаемый результат очистки выписан руками, а не посчитан тем же кодом.
+ESCAPE_CLEAN = "Имя�]52;c;aGFjaw==�\\�[2J�[31mFAKE"
+
+
+def test_status_strips_escape_sequences_from_server_text(
+    invoke: Callable[..., Any], api: respx.MockRouter, paged: Callable[..., dict[str, Any]]
+) -> None:
+    """Название доски и заголовок задачи приходят с сервера (issue #1)."""
+    api.get("/api-v2/users/me").respond(json={"id": "u1", "email": "ivan@example.com"})
+    api.get("/api-v2/task-list").respond(
+        json=paged(
+            [
+                {
+                    "id": "t1",
+                    "title": ESCAPE_ATTACK,
+                    "columnId": "col1",
+                    "idTaskProject": "ABC-1",
+                    "completed": False,
+                }
+            ]
+        )
+    )
+    api.get("/api-v2/columns/col1").respond(json={"id": "col1", "title": "Ревью", "boardId": "b1"})
+    api.get("/api-v2/boards/b1").respond(json={"id": "b1", "title": ESCAPE_ATTACK})
+    result = invoke("status")
+    assert code(result) == 0, result.output
+    assert "\x1b" not in result.output
+    # Заголовок доски и строка задачи — каждая напечатана очищенной.
+    assert result.stdout.count(ESCAPE_CLEAN) >= 2

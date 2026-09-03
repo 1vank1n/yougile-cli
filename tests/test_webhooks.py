@@ -122,7 +122,7 @@ def test_view_webhook_by_url_fragment(run: Any, api: Any) -> None:
 def test_view_webhook_ambiguous(run: Any, api: Any) -> None:
     api.get("/api-v2/webhooks").respond(json=[HOOK, OTHER])
     code, _, exc = run(["view", "webhook.site"])
-    assert code == 2
+    assert code == 1
     assert isinstance(exc, YouGileError)
 
 

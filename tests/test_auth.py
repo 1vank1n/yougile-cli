@@ -218,7 +218,7 @@ def test_login_resolves_company_by_name(cli: Any, api: Any, paged: Any) -> None:
     assert json.loads(create.calls[0].request.content)["companyId"] == COMPANY_ID
 
 
-def test_login_ambiguous_company_is_usage_error(cli: Any, api: Any, paged: Any) -> None:
+def test_login_ambiguous_company_is_a_runtime_error(cli: Any, api: Any, paged: Any) -> None:
     api.post("/api-v2/auth/companies").respond(
         json=paged(
             [
@@ -233,7 +233,7 @@ def test_login_ambiguous_company_is_usage_error(cli: Any, api: Any, paged: Any) 
         input="secret\n",
     )
 
-    assert exit_code(result) == 2, message(result)
+    assert exit_code(result) == 1, message(result)
     assert "несколько компаний" in message(result)
 
 
@@ -622,3 +622,31 @@ def test_auth_metavars_are_russian(cli: Callable[..., Any]) -> None:
         assert "EMAIL" not in output
         assert "TEXT" not in output
         assert "INTEGER" not in output
+
+
+ESCAPE_ATTACK = "Имя\x1b]52;c;aGFjaw==\x1b\\\x1b[2J\x1b[31mFAKE"
+# Ожидаемый результат очистки выписан руками, а не посчитан тем же кодом.
+ESCAPE_CLEAN = "Имя�]52;c;aGFjaw==�\\�[2J�[31mFAKE"
+MARKUP_NAME = f"{ESCAPE_ATTACK} [bold]жирный[/bold]"
+
+
+def test_login_company_picker_neutralises_company_names(cli: Any, api: Any, paged: Any) -> None:
+    """Название компании — данные с сервера: ни ESC, ни разметка rich не исполняются."""
+    api.post("/api-v2/auth/companies").respond(
+        json=paged(
+            [
+                {"id": "c-1", "name": MARKUP_NAME, "isAdmin": True},
+                {"id": COMPANY_ID, "name": "Вторая", "isAdmin": True},
+            ]
+        )
+    )
+    api.post("/api-v2/auth/keys/get").respond(
+        json=[{"key": "picked-key", "companyId": COMPANY_ID, "timestamp": 1, "deleted": False}]
+    )
+    api.get("/api-v2/users/me").respond(json=ME)
+
+    result = cli(["auth", "login", "--user", TEST_EMAIL], input="secret\n2\n")
+
+    assert exit_code(result) == 0, message(result)
+    assert "\x1b" not in result.output
+    assert f"{ESCAPE_CLEAN} [bold]жирный[/bold] (c-1)" in result.output

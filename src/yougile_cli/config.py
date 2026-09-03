@@ -15,7 +15,7 @@ Two YAML files live in ``config_dir()``:
             company_name: "Моя компания"
 
 * ``config.yml`` — settings and aliases (``version``, ``output``, ``prompt``,
-  ``pager``, ``aliases``).
+  ``aliases``).
 
 Source precedence, strictly: command-line flag → environment variable →
 ``hosts.yml`` / ``config.yml`` → built-in default.
@@ -45,7 +45,6 @@ __all__ = [
     "ENV_API_KEY",
     "ENV_CONFIG_DIR",
     "ENV_HOST",
-    "ENV_PAGER",
     "ENV_TOKEN",
     "SETTING_KEYS",
     "Host",
@@ -88,10 +87,9 @@ ENV_TOKEN = "YOUGILE_TOKEN"
 ENV_API_KEY = "YOUGILE_API_KEY"
 ENV_HOST = "YOUGILE_HOST"
 ENV_CONFIG_DIR = "YOUGILE_CONFIG_DIR"
-ENV_PAGER = "YOUGILE_PAGER"
 ENV_PYTEST = "PYTEST_CURRENT_TEST"
 
-SETTING_KEYS = ("version", "output", "prompt", "pager")
+SETTING_KEYS = ("version", "output", "prompt")
 
 
 # --------------------------------------------------------------------------- models
@@ -137,12 +135,16 @@ class Hosts(RootModel[dict[str, Host]]):
 
 
 class Settings(BaseModel):
-    """``config.yml``: defaults and aliases."""
+    """``config.yml``: defaults and aliases.
+
+    Extra keys are ignored on purpose (no ``extra="forbid"``): files written by
+    older versions carry settings that no longer exist, and loading must not fail
+    on them.
+    """
 
     version: str = "1"
     output: str = DEFAULT_OUTPUT
     prompt: str = "enabled"
-    pager: str = ""
     aliases: dict[str, str] = Field(default_factory=dict)
 
 

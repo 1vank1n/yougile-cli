@@ -316,3 +316,15 @@ def test_server_400_is_runtime_error_not_usage(dept, api) -> None:
     result = dept(["delete", SALES_ID, "--yes"])
     assert result.code == 1
     assert "Нельзя удалить последний отдел" in str(result.exception)
+
+
+ESCAPE_ATTACK = "Отдел\x1b]52;c;aGFjaw==\x1b\\\x1b[2J\x1b[31mFAKE"
+
+
+def test_tree_strips_escape_sequences_from_titles(dept, api, paged) -> None:
+    """Названия отделов приходят с сервера (issue #1)."""
+    api.get(PATH).respond(json=paged([{**DEV, "title": ESCAPE_ATTACK}]))
+    result = dept("tree")
+    assert result.code == 0, result.output
+    assert "\x1b" not in result.output
+    assert "�" in result.stdout

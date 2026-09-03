@@ -42,7 +42,7 @@ from ..errors import (
     not_specified_message,
     single_name,
 )
-from ..output import OutputFormat, is_tty
+from ..output import OutputFormat, is_tty, sanitize_terminal_text
 from ..resolve import (
     parse_kv_options,
     parse_task_url,
@@ -741,12 +741,16 @@ def status_cmd(
 
     width = max(len(str(row["code"])) for row in rows)
     for board, items in grouped.items():
-        app_ctx.console.print(f"\n{board}", style="bold", markup=False, highlight=False)
+        app_ctx.console.print(
+            sanitize_terminal_text(f"\n{board}"), style="bold", markup=False, highlight=False
+        )
         for row in items:
             code = str(row["code"]).ljust(width)
             column = f"  ({row['column']})" if row["column"] else ""
             app_ctx.console.print(
-                f"  {code}  {row['title']}{column}", markup=False, highlight=False
+                sanitize_terminal_text(f"  {code}  {row['title']}{column}"),
+                markup=False,
+                highlight=False,
             )
 
 

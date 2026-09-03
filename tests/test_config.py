@@ -211,6 +211,18 @@ def test_settings_roundtrip_and_defaults() -> None:
     assert list_settings()["output"] == "json"
 
 
+def test_old_config_with_pager_still_loads() -> None:
+    """`pager` жил в config.yml до 0.2.0; такие файлы уже есть у пользователей."""
+    settings_path().parent.mkdir(parents=True, exist_ok=True)
+    settings_path().write_text(
+        "version: '1'\noutput: json\nprompt: enabled\npager: less\n", encoding="utf-8"
+    )
+    settings = load_settings()
+    assert settings.output == "json"
+    assert not hasattr(settings, "pager")
+    assert "pager" not in list_settings()
+
+
 def test_settings_reject_unknown_key() -> None:
     with pytest.raises(ValidationError) as excinfo:
         set_setting("nonsense", "1")
@@ -295,7 +307,7 @@ def test_corrupt_file_message_stays_one_line(isolated_config: Path) -> None:
     assert "\n" not in message
     assert "yougile.com" in message
 
-    settings_path().write_text("pager: 42\n", encoding="utf-8")
+    settings_path().write_text("output: 42\n", encoding="utf-8")
     with pytest.raises(ConfigError) as excinfo:
         load_settings()
     assert "errors.pydantic.dev" not in str(excinfo.value)

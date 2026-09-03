@@ -25,7 +25,7 @@ from ..errors import (
     single_name,
 )
 from ..htmltext import html_to_text
-from ..output import OutputFormat, is_tty, target_label
+from ..output import OutputFormat, is_tty, sanitize_terminal_text, target_label
 from ..resolve import extract_id_from_url, is_uuid, resolve_one, resolve_task_id, resolve_user_id
 
 __all__ = ["app", "message_app"]
@@ -328,9 +328,11 @@ def _print_attachments(app_ctx: AppContext, attachments: list[tuple[Any, Attachm
     width = max(len(str(message_id)) for message_id, _ in attachments)
     for message_id, item in attachments:
         console.print(
-            f"{str(message_id).ljust(width)}  {ATTACHMENT_MARK}{item.name}  "
-            # Without `previews[]` the link answers with the original, not a 480×480 preview.
-            f"{strip_preview(item.url)}",
+            sanitize_terminal_text(
+                f"{str(message_id).ljust(width)}  {ATTACHMENT_MARK}{item.name}  "
+                # Without `previews[]` the link answers with the original, not a 480×480 preview.
+                f"{strip_preview(item.url)}"
+            ),
             markup=False,
             highlight=False,
             crop=False,

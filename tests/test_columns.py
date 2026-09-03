@@ -372,5 +372,5 @@ def test_ambiguous_column_name_uses_plural_genitive(
 ) -> None:
     api.get("/api-v2/columns").respond(json=paged([COLUMN, {**COLUMN, "id": OTHER_BOARD_ID}]))
     result = invoke(["view", "В работе"])
-    assert code(result) == 2
+    assert code(result) == 1
     assert "Найдено несколько (2) колонок с именем «В работе»." in str(result.exception)

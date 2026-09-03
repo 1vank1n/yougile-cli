@@ -386,11 +386,12 @@ def test_message_delete_without_yes_needs_a_tty(api: Any, run: Any) -> None:
 
 
 def test_message_ambiguous_chat_name(api: Any, paged: Any, run: Any) -> None:
+    """Неоднозначное имя — ошибка выполнения, а не вызова: код 1 (issue #9)."""
     api.get("/api-v2/group-chats").respond(
         json=paged([CHAT, {"id": OTHER_CHAT_ID, "title": "Общий чат"}])
     )
     result = run(["messages", "Общ"])
-    assert code(result) == 2
+    assert code(result) == 1
 
 
 def test_send_editor_refused_without_prompts(
@@ -550,3 +551,46 @@ def test_empty_chat_target_uses_the_shared_wording(run: Any) -> None:
     result = run(["messages", ""])
     assert code(result) == 1
     assert str(result.exception) == not_specified_message("чат")
+
+
+ESCAPE_ATTACK = "Задача\x1b]52;c;aGFjaw==\x1b\\\x1b[2J\x1b[31mFAKE"
+# Ожидаемый результат очистки выписан руками, а не посчитан тем же кодом.
+ESCAPE_CLEAN = "Задача\ufffd]52;c;aGFjaw==\ufffd\\\ufffd[2J\ufffd[31mFAKE"
+
+
+def test_messages_strip_escape_sequences(api: Any, paged: Any, run: Any) -> None:
+    """Текст сообщения пишет кто угодно с доступом к чату (issue #1)."""
+    api.get(MESSAGES_PATH).respond(
+        json=paged([{**MESSAGE_OLD, "text": ESCAPE_ATTACK, "textHtml": f"<p>{ESCAPE_ATTACK}</p>"}])
+    )
+    result = run(["messages", CHAT_ID])
+    assert code(result) == 0, result.output
+    assert "\x1b" not in result.output
+    assert ESCAPE_CLEAN in result.stdout
+
+
+def test_chat_view_strips_escape_sequences(api: Any, paged: Any, run: Any) -> None:
+    api.get(f"/api-v2/group-chats/{CHAT_ID}").respond(json={**CHAT, "title": ESCAPE_ATTACK})
+    result = run(["view", CHAT_ID])
+    assert code(result) == 0, result.output
+    assert "\x1b" not in result.output
+    assert ESCAPE_CLEAN in result.stdout
+
+
+def test_attachment_block_strips_escape_sequences(api: Any, paged: Any, run: Any) -> None:
+    """Имя вложения приходит из ссылки: %1b раскодируется в ESC до печати."""
+    api.get(MESSAGES_PATH).respond(
+        json=paged(
+            [
+                {
+                    **MESSAGE_FILE,
+                    "text": f"/root/#file:/user-data/{FILE_UUID}/a%1B%5B31mfake.jpg",
+                }
+            ]
+        )
+    )
+    result = run(["messages", CHAT_ID])
+    assert code(result) == 0, result.output
+    assert "ВЛОЖЕНИЯ" in result.stdout
+    assert "\x1b" not in result.output
+    assert "a\ufffd[31mfake.jpg" in result.stdout

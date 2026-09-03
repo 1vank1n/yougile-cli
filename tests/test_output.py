@@ -5,6 +5,7 @@ import shutil
 from typing import Any
 
 import pytest
+import yaml
 
 from yougile_cli.errors import ValidationError, YouGileError
 from yougile_cli.output import (
@@ -24,6 +25,7 @@ from yougile_cli.output import (
     render,
     render_table,
     run_jq,
+    sanitize_terminal_text,
     select_fields,
     set_color_override,
     shorten_id,
@@ -193,6 +195,29 @@ def test_table_has_no_ansi_when_piped(capsys: pytest.CaptureFixture[str]) -> Non
     assert "\x1b[" not in capsys.readouterr().out
 
 
+ESCAPE_ATTACK = "Задача\x1b]52;c;aGFjaw==\x1b\\\x1b[2J\x1b[31mFAKE"
+
+
+def test_sanitize_replaces_every_control_character_with_one_placeholder() -> None:
+    """Каждый вырезанный символ виден как «\ufffd», иначе название не отличить от чистого."""
+    assert sanitize_terminal_text("a\x00\x01b") == "a\ufffd\ufffdb"
+    assert sanitize_terminal_text("\x1b[31m") == "\ufffd[31m"
+    assert sanitize_terminal_text("a\x80b\x9fc") == "a\ufffdb\ufffdc"
+
+
+def test_sanitize_keeps_newline_tab_and_ordinary_text() -> None:
+    assert sanitize_terminal_text("строка\nдруг\tая") == "строка\nдруг\tая"
+    assert sanitize_terminal_text("Задача 🎉 «кавычки» — тире") == "Задача 🎉 «кавычки» — тире"
+    assert sanitize_terminal_text("") == ""
+
+
+def test_sanitize_defangs_the_osc52_clipboard_payload() -> None:
+    cleaned = sanitize_terminal_text(ESCAPE_ATTACK)
+    assert "\x1b" not in cleaned
+    assert cleaned.startswith("Задача\ufffd")
+    assert cleaned.endswith("FAKE")
+
+
 def test_output_options_machine_readable() -> None:
     assert OutputOptions().machine_readable is False
     assert OutputOptions(fmt=OutputFormat.JSON).machine_readable is True
@@ -291,3 +316,30 @@ def test_print_kv_full_ids(capsys: pytest.CaptureFixture[str]) -> None:
 def test_non_uuid_values_are_untouched() -> None:
     assert format_value("Задача про 11111111", key="title") == "Задача про 11111111"
     assert format_value("111111111111111111", key="externalId") == "11111111"
+
+
+def test_csv_and_tsv_strip_escape_sequences(capsys: pytest.CaptureFixture[str]) -> None:
+    """R01.2: ESC уходил в файл как есть — `cat` отчёта выполнял бы его."""
+    rows = [{"title": ESCAPE_ATTACK}]
+    render(rows, OutputOptions(fmt=OutputFormat.CSV), columns=["title"])
+    csv_out = capsys.readouterr().out
+    render(rows, OutputOptions(fmt=OutputFormat.TSV), columns=["title"])
+    tsv_out = capsys.readouterr().out
+    assert "\x1b" not in csv_out and "\x1b" not in tsv_out
+    assert "�" in csv_out and "�" in tsv_out
+
+
+def test_json_and_yaml_keep_the_original_characters_escaped(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """R01.3: машинные форматы экранируют сами — очистка там потеряла бы данные."""
+    rows = [{"title": ESCAPE_ATTACK}]
+    render(rows, OutputOptions(fmt=OutputFormat.JSON))
+    json_out = capsys.readouterr().out
+    assert "\x1b" not in json_out
+    assert json.loads(json_out)[0]["title"] == ESCAPE_ATTACK
+
+    render(rows, OutputOptions(fmt=OutputFormat.YAML))
+    yaml_out = capsys.readouterr().out
+    assert "\x1b" not in yaml_out
+    assert yaml.safe_load(yaml_out)[0]["title"] == ESCAPE_ATTACK

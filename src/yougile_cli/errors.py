@@ -176,9 +176,12 @@ class ResolveError(YouGileError):
 
 
 class AmbiguousNameError(ResolveError):
-    """A name matched more than one object."""
+    """A name matched more than one object.
 
-    exit_code = EXIT_USAGE
+    A runtime failure, not a usage error: the command was written correctly and
+    only the server data made it ambiguous, so retrying with a narrower name is
+    what helps. The code stays the base one; the tests pin its value.
+    """
 
     def __init__(
         self,

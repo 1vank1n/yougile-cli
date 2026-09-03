@@ -895,3 +895,55 @@ def test_attachments_json_has_english_keys(run: Any, api: respx.MockRouter, page
     assert rows[0]["name"] == "IMG_1.jpg"
     assert rows[0]["source"] == "описание"
     assert rows[0]["url"] == "https://yougile.com/user-data/aaa/IMG_1.jpg"
+
+
+ESCAPE_ATTACK = "Задача\x1b]52;c;aGFjaw==\x1b\\\x1b[2J\x1b[31mFAKE"
+# Ожидаемый результат очистки выписан руками, а не посчитан тем же кодом.
+ESCAPE_CLEAN = "Задача\ufffd]52;c;aGFjaw==\ufffd\\\ufffd[2J\ufffd[31mFAKE"
+
+
+def test_list_strips_escape_sequences_from_titles(
+    run: Any, api: respx.MockRouter, paged: Any
+) -> None:
+    """Заголовок задачи — данные с сервера, а не команда терминалу (issue #1)."""
+    api.get("/api-v2/task-list").respond(json=paged([task_payload(title=ESCAPE_ATTACK)]))
+    result = run("task list")
+    assert result.exit_code == 0, result.output
+    assert "\x1b" not in result.output
+    assert ESCAPE_CLEAN in result.stdout
+
+
+def test_view_strips_escape_sequences_everywhere(
+    run: Any, api: respx.MockRouter, paged: Any
+) -> None:
+    """Title, описание, чек-листы и подзадачи приходят с сервера — ни одна не команда."""
+    api.get(f"/api-v2/tasks/{TASK_ID}").respond(
+        json=task_payload(
+            title=ESCAPE_ATTACK,
+            description=f"<p>{ESCAPE_ATTACK}</p>",
+            checklists=[{"title": ESCAPE_ATTACK, "items": [{"title": ESCAPE_ATTACK}]}],
+            subtasks=[OTHER_TASK_ID],
+        )
+    )
+    api.get(f"/api-v2/tasks/{OTHER_TASK_ID}").respond(json=task_payload(title=ESCAPE_ATTACK))
+    api.get(f"/api-v2/chats/{TASK_ID}/messages").respond(json=paged([]))
+    result = run(["task", "view", TASK_ID])
+    assert result.exit_code == 0, result.output
+    assert "\x1b" not in result.output
+    assert "ОПИСАНИЕ" in result.stdout
+    assert "ЧЕК-ЛИСТЫ" in result.stdout
+    assert "ПОДЗАДАЧИ" in result.stdout
+    # title, описание, заголовок чек-листа, его пункт, подзадача — каждый напечатан очищенным.
+    assert result.stdout.count(ESCAPE_CLEAN) >= 5
+
+
+def test_view_raw_description_strips_escape_sequences(
+    run: Any, api: respx.MockRouter, paged: Any
+) -> None:
+    api.get(f"/api-v2/tasks/{TASK_ID}").respond(json=task_payload(description=ESCAPE_ATTACK))
+    api.get(f"/api-v2/chats/{TASK_ID}/messages").respond(json=paged([]))
+    result = run(["task", "view", TASK_ID, "--raw-description"])
+    assert result.exit_code == 0, result.output
+    assert "\x1b" not in result.output
+    assert "ОПИСАНИЕ" in result.stdout
+    assert ESCAPE_CLEAN in result.stdout

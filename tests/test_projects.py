@@ -388,7 +388,7 @@ def test_missing_project_name_is_masculine(run: Any, api: Any, paged: Any) -> No
 def test_ambiguous_project_name_uses_plural_genitive(run: Any, api: Any, paged: Any) -> None:
     api.get("/api-v2/projects").respond(json=paged([PROJECT, {**PROJECT, "id": USER_ID}]))
     code, _, exc = run(["view", "Ремонт"])
-    assert code == 2
+    assert code == 1
     assert "Найдено несколько (2) проектов с именем «Ремонт»." in str(exc)
 
 

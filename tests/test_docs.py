@@ -14,7 +14,6 @@ SUPPORTED_ENV = {
     config.ENV_API_KEY,
     config.ENV_HOST,
     config.ENV_CONFIG_DIR,
-    config.ENV_PAGER,
     "YOUGILE_EDITOR",
 }
 

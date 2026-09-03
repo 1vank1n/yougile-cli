@@ -12,7 +12,7 @@ from rich.tree import Tree
 from ..client import YouGileClient
 from ..context import AppContext, get_ctx
 from ..errors import CancelledError, ValidationError, single_name
-from ..output import OutputFormat, is_tty, shorten_id, target_label
+from ..output import OutputFormat, is_tty, sanitize_terminal_text, shorten_id, target_label
 from ..resolve import resolve_board_id, resolve_project_id
 
 __all__ = ["app"]
@@ -357,7 +357,7 @@ def _render_tree(data: dict[str, Any], *, full_ids: bool = False) -> Tree:
 
     def title_of(item: dict[str, Any]) -> str:
         # Titles come from the API: a bracket in one would otherwise be read as rich markup.
-        return escape(str(item.get("title") or ""))
+        return escape(sanitize_terminal_text(str(item.get("title") or "")))
 
     root = Tree(f"[bold]{title_of(data)}[/bold] [dim]{tag(data.get('id'))}[/dim]")
     for column in data.get("columns", []):

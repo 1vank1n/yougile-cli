@@ -39,7 +39,7 @@ from ..errors import (
     ResolveError,
     ValidationError,
 )
-from ..output import OutputFormat, is_tty
+from ..output import OutputFormat, is_tty, sanitize_terminal_text
 
 __all__ = ["app", "keys_app"]
 
@@ -276,7 +276,13 @@ def _choose_company(
     _require_prompt(app_ctx, "Укажите компанию флагом --company.")
     app_ctx.console.print("Доступные компании:")
     for index, company in enumerate(companies, start=1):
-        app_ctx.console.print(f"  {index}. {company.get('name', '')} ({company.get('id', '')})")
+        app_ctx.console.print(
+            sanitize_terminal_text(
+                f"  {index}. {company.get('name', '')} ({company.get('id', '')})"
+            ),
+            markup=False,
+            highlight=False,
+        )
     number = typer.prompt("Номер компании", type=int)
     if not 1 <= number <= len(companies):
         raise ValidationError(f"Нет компании с номером {number}.")

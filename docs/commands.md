@@ -1178,6 +1178,14 @@ yougile task attachments [ОПЦИИ] {ЗАДАЧА}
 yougile task attachments ILS-343 --download --dir ~/Downloads/ILS-343
 ```
 
+В список вложений попадают только ссылки на хост авторизации и на парный облачный
+хост YouGile (`yougile.com` и `ru.yougile.com` — одно и то же облако); ссылка на
+посторонний хост не попадает в список и не скачивается.
+
+Заголовок `Authorization: Bearer` уходит только на хост авторизации и на парный
+облачный хост YouGile и снимается при любом переходе на чужой origin, включая
+редирект, — так же, как это делает `gh api`.
+
 ### `yougile task create`
 
 Создать задачу и напечатать ссылку на неё.
@@ -2844,6 +2852,10 @@ yougile file download [ОПЦИИ] {URL}
 ```bash
 yougile file download 'https://ru.yougile.com/user-data/9f0c.../IMG_20260828_173932.jpg' -o ~/Downloads
 ```
+
+Заголовок `Authorization: Bearer` уходит только на хост авторизации и на парный
+облачный хост YouGile и снимается при любом переходе на чужой origin, включая
+редирект, — так же, как это делает `gh api`.
 
 ## crm: CRM
 

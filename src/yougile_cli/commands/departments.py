@@ -12,7 +12,7 @@ from rich.tree import Tree
 from ..client import YouGileClient
 from ..context import AppContext, get_ctx
 from ..errors import CancelledError, ResolveError, ValidationError, single_name
-from ..output import OutputFormat, is_tty, shorten_id, target_label
+from ..output import OutputFormat, is_tty, sanitize_terminal_text, shorten_id, target_label
 from ..resolve import parse_kv_options, resolve_one, resolve_user_id
 
 __all__ = ["app", "resolve_department_id"]
@@ -110,7 +110,7 @@ def _users_payload(client: YouGileClient, values: list[str] | None) -> dict[str,
 
 
 def _label(item: dict[str, Any], *, full_ids: bool) -> Text:
-    text = Text(str(item.get("title") or "(без названия)"), style="bold")
+    text = Text(sanitize_terminal_text(str(item.get("title") or "(без названия)")), style="bold")
     item_id = str(item.get("id") or "")
     if item_id:
         text.append(f"  {shorten_id(item_id, full=full_ids)}", style="dim")
