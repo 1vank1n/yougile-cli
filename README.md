@@ -3,7 +3,7 @@
 Управляйте задачами, досками и проектами YouGile прямо из терминала — с эргономикой GitHub CLI.
 
 [![CI](https://github.com/1vank1n/yougile-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/1vank1n/yougile-cli/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/1vank1n/yougile-cli/blob/main/LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
 ## Что это
@@ -44,15 +44,17 @@
 ## Установка
 
 ```bash
-uv tool install git+https://github.com/1vank1n/yougile-cli
+uv tool install yougile-cli
 ```
 
 Альтернативы:
 
 ```bash
-pipx install git+https://github.com/1vank1n/yougile-cli
-pip install git+https://github.com/1vank1n/yougile-cli
+pipx install yougile-cli
+pip install yougile-cli
 ```
+
+Неопубликованная версия с `main` — `uv tool install git+https://github.com/1vank1n/yougile-cli`.
 
 После установки в `PATH` появляются два имени — полное `yougile` и короткое `yg`.
 Они полностью взаимозаменяемы:
@@ -268,26 +270,26 @@ yougile task list --json id,title --jq '.[] | select(.title | test("оплата
 
 | Группа | Команды |
 | --- | --- |
-| [`auth`](docs/commands.md#auth-авторизация) | `login`, `logout`, `status`, `token`, `switch`, `refresh`, `keys list\|create\|delete` |
-| [`project`](docs/commands.md#project-проекты) | `list`, `view`, `create`, `edit`, `delete`, `role list\|view\|create\|edit\|delete` |
-| [`board`](docs/commands.md#board-доски) | `list`, `view`, `create`, `edit`, `delete`, `tree` |
-| [`column`](docs/commands.md#column-колонки) | `list`, `view`, `create`, `edit`, `delete`, `move` |
-| [`task`](docs/commands.md#task-задачи) | `list`, `view`, `attachments`, `create`, `edit`, `close`, `reopen`, `archive`, `unarchive`, `delete`, `move`, `assign`, `unassign`, `comment`, `subscribers list\|add\|remove\|set` |
-| [`user`](docs/commands.md#user-сотрудники) | `list`, `view`, `invite`, `edit`, `delete` |
-| [`department`](docs/commands.md#department-отделы) | `list`, `view`, `create`, `edit`, `delete`, `tree` |
-| [`sticker`](docs/commands.md#sticker-стикеры) | `string list\|view\|create\|edit\|delete\|icons`, `string state list\|add\|edit\|delete`, `sprint list\|view\|create\|edit\|delete`, `sprint state list\|add\|edit\|delete` |
-| [`chat`](docs/commands.md#chat-чаты-и-сообщения) | `list`, `view`, `create`, `edit`, `delete`, `send`, `messages`, `typing`, `message view\|edit\|delete` |
-| [`webhook`](docs/commands.md#webhook-подписки-на-события) | `list`, `view`, `create`, `edit`, `delete`, `events` |
-| [`company`](docs/commands.md#company-компания) | `view`, `edit` |
-| [`file`](docs/commands.md#file-файлы) | `upload`, `download` |
-| [`crm`](docs/commands.md#crm-crm) | `contact create`, `contact view` |
-| [`config`](docs/commands.md#config-настройки) | `get`, `set`, `list`, `clear-cache` |
-| [`alias`](docs/commands.md#alias-алиасы) | `list`, `set`, `delete` |
-| [`completion`](docs/commands.md#completion-автодополнение) | `completion -s ОБОЛОЧКА`, `install` |
-| [верхний уровень](docs/commands.md#верхний-уровень) | `api`, `browse`, `status`, `version` |
+| [`auth`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#auth-авторизация) | `login`, `logout`, `status`, `token`, `switch`, `refresh`, `keys list\|create\|delete` |
+| [`project`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#project-проекты) | `list`, `view`, `create`, `edit`, `delete`, `role list\|view\|create\|edit\|delete` |
+| [`board`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#board-доски) | `list`, `view`, `create`, `edit`, `delete`, `tree` |
+| [`column`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#column-колонки) | `list`, `view`, `create`, `edit`, `delete`, `move` |
+| [`task`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#task-задачи) | `list`, `view`, `attachments`, `create`, `edit`, `close`, `reopen`, `archive`, `unarchive`, `delete`, `move`, `assign`, `unassign`, `comment`, `subscribers list\|add\|remove\|set` |
+| [`user`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#user-сотрудники) | `list`, `view`, `invite`, `edit`, `delete` |
+| [`department`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#department-отделы) | `list`, `view`, `create`, `edit`, `delete`, `tree` |
+| [`sticker`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#sticker-стикеры) | `string list\|view\|create\|edit\|delete\|icons`, `string state list\|add\|edit\|delete`, `sprint list\|view\|create\|edit\|delete`, `sprint state list\|add\|edit\|delete` |
+| [`chat`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#chat-чаты-и-сообщения) | `list`, `view`, `create`, `edit`, `delete`, `send`, `messages`, `typing`, `message view\|edit\|delete` |
+| [`webhook`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#webhook-подписки-на-события) | `list`, `view`, `create`, `edit`, `delete`, `events` |
+| [`company`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#company-компания) | `view`, `edit` |
+| [`file`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#file-файлы) | `upload`, `download` |
+| [`crm`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#crm-crm) | `contact create`, `contact view` |
+| [`config`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#config-настройки) | `get`, `set`, `list`, `clear-cache` |
+| [`alias`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#alias-алиасы) | `list`, `set`, `delete` |
+| [`completion`](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#completion-автодополнение) | `completion -s ОБОЛОЧКА`, `install` |
+| [верхний уровень](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md#верхний-уровень) | `api`, `browse`, `status`, `version` |
 
 Полный справочник — все 114 команд со всеми аргументами, флагами и примерами —
-в [docs/commands.md](docs/commands.md).
+в [docs/commands.md](https://github.com/1vank1n/yougile-cli/blob/main/docs/commands.md).
 
 ## Рецепты
 
@@ -484,8 +486,8 @@ yougile-cli/
 
 Правила простые: Python 3.11+, строка не длиннее 100 символов, полные аннотации
 типов, тексты для пользователя по-русски, идентификаторы и комментарии по-английски.
-Подробности — в [CONTRIBUTING.md](CONTRIBUTING.md).
+Подробности — в [CONTRIBUTING.md](https://github.com/1vank1n/yougile-cli/blob/main/CONTRIBUTING.md).
 
 ## Лицензия
 
-MIT © Ivan Lukyanets. Полный текст — в файле [LICENSE](LICENSE).
+MIT © Ivan Lukyanets. Полный текст — в файле [LICENSE](https://github.com/1vank1n/yougile-cli/blob/main/LICENSE).

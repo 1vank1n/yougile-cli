@@ -53,9 +53,8 @@ uv run mypy src
 ```
 
 Все четыре команды должны проходить без замечаний. CI
-(`.github/workflows/ci.yml`) проверяет то же самое, только в неправящем виде:
-`ruff check src tests`, `ruff format --check src tests`, `pytest -q --cov` на
-Python 3.11–3.13 под Linux и macOS, плюс `mypy src` отдельной задачей.
+(`.github/workflows/ci.yml`) прогоняет тот же перечень в неправящем виде на
+Python 3.11–3.13 под Linux и macOS.
 
 Тесты не ходят в сеть: HTTP замокан через `respx`, а конфигурация подменяется
 временным каталогом через `YOUGILE_CONFIG_DIR`. Любой новый запрос к API должен
@@ -96,6 +95,41 @@ Python 3.11–3.13 под Linux и macOS, плюс `mypy src` отдельной
 ```bash
 YOUGILE_CONFIG_DIR=$(mktemp -d) uv run yougile task attachments --help
 ```
+
+## Релиз
+
+Публикация на PyPI идёт из GitHub Actions по тегу: релизный workflow собирает
+колесо и sdist, сверяет версию в колесе с тегом и заливает проверенные
+артефакты. Ручной `twine upload` не нужен.
+
+1. Поднимите версию в `src/yougile_cli/__init__.py` — она живёт только там.
+2. Закройте в `CHANGELOG.md` раздел `[Unreleased]`: новый заголовок с номером
+   и датой, блок «Как обновиться» с командами установки.
+3. Прогоните четыре проверки из раздела «Перед пул-реквестом» — все должны
+   быть зелёными.
+4. Слейте изменения в `main`.
+5. Запушьте тег: `git tag v<версия> && git push origin v<версия>`.
+   Версия в теге должна совпадать с версией в `__init__.py`, иначе релиз упадёт.
+6. Проверьте страницу пакета: <https://pypi.org/project/yougile-cli/> —
+   описание, ссылки и номер версии.
+
+### Разовая настройка на pypi.org
+
+Токен PyPI в репозитории не хранится: заливка идёт через Trusted Publishing по
+OIDC. До первого релиза нужно один раз завести pending publisher на
+pypi.org → Publishing → GitHub:
+
+| Поле | Значение |
+|---|---|
+| PyPI Project Name | `yougile-cli` |
+| Owner | `1vank1n` |
+| Repository name | `yougile-cli` |
+| Workflow name | `release.yml` |
+| Environment name | *(оставить пустым)* |
+
+Environment намеренно пуст: workflow не использует GitHub environment, и
+непустое значение здесь даст отказ в момент публикации. Пока pending publisher
+не заведён, релизный workflow падает на шаге обмена токена.
 
 ## Сообщить о проблеме
 

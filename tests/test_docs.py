@@ -44,3 +44,23 @@ def test_readme_documents_every_setting_and_env_var() -> None:
         assert key in readme
     for name in SUPPORTED_ENV:
         assert name in readme
+
+
+def test_readme_offers_the_pypi_install_before_the_git_one() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    pypi = readme.index("uv tool install yougile-cli")
+    assert "pipx install yougile-cli" in readme
+    assert "pip install yougile-cli" in readme
+    git_lines = [line for line in readme.splitlines() if "git+https://" in line]
+    assert len(git_lines) == 1
+    assert "неопубликованная версия" in git_lines[0].lower()
+    assert "`main`" in git_lines[0]
+    assert pypi < readme.index(git_lines[0])
+
+
+def test_readme_links_are_absolute_so_pypi_does_not_resolve_them_against_itself() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    targets = re.findall(r"\]\(([^)\s]+)", readme)
+    assert targets
+    relative = [t for t in targets if not t.startswith(("http://", "https://", "mailto:", "#"))]
+    assert relative == []

@@ -12,8 +12,8 @@
 ### Как обновиться
 
 ```bash
-uv tool install --force git+https://github.com/1vank1n/yougile-cli
-# pipx install --force <та же ссылка>   ·   pip install -U <та же ссылка>
+uv tool install --force yougile-cli
+# pipx install --force yougile-cli   ·   pip install -U yougile-cli
 ```
 
 Скриптам на 0.1.0: неоднозначное имя теперь завершается кодом `1`, а не `2`, а
