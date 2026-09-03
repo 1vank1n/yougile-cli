@@ -7,6 +7,65 @@
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-03
+
+### Как обновиться
+
+```bash
+uv tool install --force git+https://github.com/1vank1n/yougile-cli
+# pipx install --force <та же ссылка>   ·   pip install -U <та же ссылка>
+```
+
+Скриптам на 0.1.0: неоднозначное имя теперь завершается кодом `1`, а не `2`, а
+настройка `pager` удалена — `yougile config set pager` стал ошибкой (старый
+`config.yml` с ключом `pager` при этом читается по-прежнему).
+
+### Безопасность
+
+- Строки, пришедшие с сервера, больше не управляют терминалом: управляющие
+  последовательности (`\x00`–`\x08`, `\x0b`–`\x1f`, `\x80`–`\x9f`) заменяются
+  на `�`. Это касается вывода `table`, `csv` и `tsv` — то есть и экрана
+  (описания задач, вложения, чек-листы, подзадачи, сообщения чатов, дерево
+  досок, отделы, `status`, выбор компании в `auth login`), и файла с выгрузкой,
+  который потом откроют в терминале. Форматы `json` и `yaml` не очищаются —
+  они экранируют сами, и очистка потеряла бы данные. ([#1])
+
+### Изменено
+
+- Неоднозначное имя — когда под указанное название подходит несколько досок,
+  проектов, чатов и так далее — завершается кодом `1` вместо `2`. Код `2`
+  остался только за ошибками вызова: разбором аргументов и нашей валидацией
+  до отправки запроса. ([#9])
+- Настройка `pager` удалена: её нет в `config get|set|list`, переменная
+  окружения `YOUGILE_PAGER` больше не читается, упоминаний в README и
+  `docs/commands.md` не осталось. Старый `config.yml` с ключом `pager`
+  читается без ошибки. ([#10])
+
+### Добавлено
+
+- `--json` без значения печатает перечень доступных полей без сети и без
+  входа: список берётся из статической схемы ресурсов API (новый модуль
+  `yougile_cli.fields`) и объединяется с полями фактических строк, поэтому
+  перечень виден и на пустой выдаче. Команды, для которых подтверждённой схемы
+  нет (`task subscribers list`, `chat typing`, `file upload|download`,
+  `crm contact create|view`), ведут себя как прежде: без входа перечень полей
+  у них по-прежнему недоступен — «Вход не выполнен» и код `4`. ([#3])
+- Маркер PEP 561 `src/yougile_cli/py.typed` — аннотации пакета видны
+  потребителям и проверяются реальной сборкой колеса. ([#7])
+- В состав sdist добавлены `CHANGELOG.md`, `CONTRIBUTING.md` и `docs/`. ([#6])
+- CI: задача `build` собирает колесо и sdist, сверяет их состав, ставит колесо
+  в чистое окружение и прогоняет `yougile --version` и `yg --help`. Проверка
+  вынесена в composite action `./.github/actions/build-and-verify` и
+  переиспользуется релизом, который сверяет с ней тег. ([#4])
+
+### Исправлено
+
+- Версия пакета больше не дублируется: `pyproject.toml` объявляет
+  `dynamic = ["version"]` и читает её из `src/yougile_cli/__init__.py`. ([#2])
+- Документация описывает, куда уходит Bearer-токен: на хост авторизации и на
+  парный веб-хост того же облака (`yougile.com` ↔ `ru.yougile.com`), но не на
+  посторонние адреса; вложения с чужих хостов отбрасываются. ([#8])
+
 ## [0.1.0] — 2026-09-02
 
 Первый публичный релиз консольного клиента YouGile REST API v2.
@@ -102,5 +161,15 @@
   или лежит вне временного. Ручные прогоны CLI делаются с
   `YOUGILE_CONFIG_DIR=$(mktemp -d)` — правило описано в [CONTRIBUTING](CONTRIBUTING.md).
 
-[Unreleased]: https://github.com/1vank1n/yougile-cli/compare/v0.1.0...HEAD
+[#1]: https://github.com/1vank1n/yougile-cli/issues/1
+[#2]: https://github.com/1vank1n/yougile-cli/issues/2
+[#3]: https://github.com/1vank1n/yougile-cli/issues/3
+[#4]: https://github.com/1vank1n/yougile-cli/issues/4
+[#6]: https://github.com/1vank1n/yougile-cli/issues/6
+[#7]: https://github.com/1vank1n/yougile-cli/issues/7
+[#8]: https://github.com/1vank1n/yougile-cli/issues/8
+[#9]: https://github.com/1vank1n/yougile-cli/issues/9
+[#10]: https://github.com/1vank1n/yougile-cli/issues/10
+[Unreleased]: https://github.com/1vank1n/yougile-cli/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/1vank1n/yougile-cli/releases/tag/v0.2.0
 [0.1.0]: https://github.com/1vank1n/yougile-cli/releases/tag/v0.1.0
