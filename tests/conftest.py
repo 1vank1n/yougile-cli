@@ -73,7 +73,6 @@ ENV_VARS = (
     "YOUGILE_TOKEN",
     "YOUGILE_API_KEY",
     "YOUGILE_HOST",
-    "YOUGILE_PAGER",
     "NO_COLOR",
     "CLICOLOR_FORCE",
 )
