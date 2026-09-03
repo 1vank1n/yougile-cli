@@ -47,3 +47,6 @@ coverage.xml
 /cache/
 /.config.yml-*
 /.hosts.yml-*
+
+# Материалы прогонов /autopilot: только локально
+.autopilot/
