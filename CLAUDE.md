@@ -26,9 +26,9 @@ src/yougile_cli/       пакет: слои CLI, HTTP, вывода, конфи�
 src/yougile_cli/commands/   по модулю на группу сущностей API, каждый отдаёт свой Typer-app
 tests/                 pytest + respx; сеть не используется никогда
 docs/commands.md       полный справочник команд, ~3100 строк
-.github/workflows/     ci.yml (тесты 3.11–3.13 × linux/macos, mypy, build), release.yml (тег v* → релиз)
-.github/actions/build-and-verify/   composite action: сборка, проверка состава, дымовой запуск колеса
-.autopilot/            материалы сборки: бриф, спецификация, таски, состояние
+.github/workflows/     ci.yml (тесты 3.11–3.13 × linux/macos, mypy, build), release.yml (тег v* → GitHub-релиз, затем публикация на PyPI)
+.github/actions/build-and-verify/   composite action: сборка, проверка состава, `twine check --strict`, дымовой запуск колеса
+.autopilot/            материалы сборки: бриф, спецификация, таски, состояние; в .gitignore, только локально
 ```
 
 ## Ключевые файлы
@@ -105,6 +105,9 @@ pytest + respx, `addopts = "-q"`, `testpaths = ["tests"]`. Сети нет ни 
 - Ключ `pager` удалён из настроек; старые `config.yml` с ним читаются без ошибки (pydantic игнорирует лишние ключи), но `config set pager` отвергается.
 - `AmbiguousNameError` даёт код 1, а не 2: неоднозначное имя — ошибка выполнения, не ошибка вызова.
 - Вложения качаются только с хоста, под которым выполнен вход (`attachments.is_own_host`): описание задачи — чужой ввод, иначе ссылкой в описании можно увести CLI на любой сервер.
+- Публикация на PyPI — отдельный job `publish` в `release.yml`, права ровно `id-token: write`, без пароля и токена: Trusted Publishing по OIDC. Перед первым релизом на pypi.org → Publishing → GitHub нужно завести pending publisher (`owner=1vank1n`, `repository=yougile-cli`, `workflow=release.yml`, Environment name — пусто; непустой уронит обмен токена).
+- `publish` публикует ровно те артефакты, что собрал и проверил `release` (`actions/download-artifact`, без пересборки); `tests/test_packaging.py::test_release_publishes_to_pypi_after_the_release_job_and_without_a_password` опознаёт job по `uses: pypa/gh-action-pypi-publish`, а не по имени — переименовать job можно, поменять `uses` нельзя.
+- Ссылки в README абсолютные (`.../blob/main/...`), не относительные: PyPI резолвит относительные ссылки описания к pypi.org, иначе всё ведёт в 404.
 
 ## Как здесь работает Autopilot
 
