@@ -9,7 +9,7 @@ import typer
 
 from ..context import AppContext, emit, get_client, get_ctx
 from ..errors import CancelledError, ValidationError
-from ..output import OutputOptions, is_tty
+from ..output import OutputOptions, apply_json_fields, is_tty
 from ..resolve import ME, resolve_project_id, resolve_user_id
 
 __all__ = ["app"]
@@ -46,12 +46,15 @@ def _yes_option() -> Any:
     return typer.Option(False, "--yes", "-y", help="Не спрашивать подтверждение")
 
 
-def _apply_output(app_ctx: AppContext, json_fields: str | None, jq: str | None) -> OutputOptions:
+def _apply_output(
+    app_ctx: AppContext,
+    json_fields: str | None,
+    jq: str | None,
+    resource: str | None = "user",
+) -> OutputOptions:
     """Merge the per-command output flags into the invocation-wide options."""
     opts = app_ctx.out
-    if json_fields is not None:
-        # An empty selection makes `render` list the available fields and exit 1, like gh.
-        opts.json_fields = [field.strip() for field in json_fields.split(",") if field.strip()]
+    apply_json_fields(opts, json_fields, resource)
     if jq:
         opts.jq = jq
     return opts
@@ -107,8 +110,8 @@ def list_users(
     jq: str | None = _jq_option(),
 ) -> None:
     app_ctx = get_ctx(ctx)
-    client = get_client(ctx)
     _apply_output(app_ctx, json_fields, jq)
+    client = get_client(ctx)
 
     params: dict[str, Any] = {"email": email}
     if project:
@@ -134,8 +137,8 @@ def view_user(
     jq: str | None = _jq_option(),
 ) -> None:
     app_ctx = get_ctx(ctx)
-    client = get_client(ctx)
     _apply_output(app_ctx, json_fields, jq)
+    client = get_client(ctx)
 
     if user.strip().casefold() == ME:
         data = client.get(f"{USERS_PATH}/me")
@@ -161,8 +164,8 @@ def invite_user(
     jq: str | None = _jq_option(),
 ) -> None:
     app_ctx = get_ctx(ctx)
-    client = get_client(ctx)
     _apply_output(app_ctx, json_fields, jq)
+    client = get_client(ctx)
     body = {
         "email": single_email(address, email),
         "isAdmin": admin,
@@ -185,8 +188,8 @@ def edit_user(
     jq: str | None = _jq_option(),
 ) -> None:
     app_ctx = get_ctx(ctx)
-    client = get_client(ctx)
     _apply_output(app_ctx, json_fields, jq)
+    client = get_client(ctx)
     if admin is None and messenger_only is None:
         raise ValidationError(
             "Нечего менять.",
@@ -208,8 +211,8 @@ def delete_user(
     jq: str | None = _jq_option(),
 ) -> None:
     app_ctx = get_ctx(ctx)
-    client = get_client(ctx)
     _apply_output(app_ctx, json_fields, jq)
+    client = get_client(ctx)
     user_id = resolve_user_id(client, user)
     _confirm(app_ctx, f"Удалить сотрудника {user_id} из компании?", yes=yes)
     # Users are one of the three resources with a real DELETE method.

@@ -338,6 +338,31 @@ def test_empty_json_lists_available_fields(run: Any, api: respx.MockRouter, page
     assert "name" in str(result.exception.hint or "")
 
 
+def test_empty_json_lists_fields_on_an_empty_list_without_asking_the_server(
+    run: Any, api: respx.MockRouter, paged: Any
+) -> None:
+    route = api.get(STRING_PATH).respond(json=paged([]))
+    result = run(["sticker", "string", "list", "--json", ""])
+    assert exit_code_for(result.exception) == 1
+    assert "icon" in str(result.exception.hint or "")
+    assert not route.called
+
+
+def test_empty_json_lists_fields_without_a_client(runner: CliRunner, api: respx.MockRouter) -> None:
+    """Перечень полей — вопрос об именах: ни ключа, ни запроса для ответа не нужно."""
+    root = typer.Typer()
+    root.add_typer(stickers.app, name="sticker")
+
+    @root.callback()
+    def _root(ctx: typer.Context) -> None:
+        ctx.obj = AppContext(out=OutputOptions(fmt=OutputFormat.JSON))
+
+    result = runner.invoke(root, ["sticker", "string", "list", "--json", ""])
+    assert exit_code_for(result.exception) == 1
+    assert "icon" in str(result.exception.hint or "")
+    assert not api.calls
+
+
 def test_api_error_propagates(run: Any, api: respx.MockRouter) -> None:
     api.get(f"{STRING_PATH}/{SID}").respond(404, json={"message": "not found"})
     result = run(["sticker", "string", "view", SID])

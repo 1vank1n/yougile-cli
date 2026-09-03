@@ -29,12 +29,14 @@ import yaml
 from rich.console import Console
 
 from .errors import ValidationError, YouGileError
+from .fields import static_fields
 
 __all__ = [
     "EMPTY_NOTICE",
     "ID_WIDTH",
     "OutputFormat",
     "OutputOptions",
+    "apply_json_fields",
     "available_fields",
     "color_enabled",
     "compact",
@@ -106,6 +108,7 @@ class OutputOptions:
     limit: int = 30
     full_ids: bool = False
     columns: list[str] | None = field(default=None)
+    resource: str | None = None
 
     @property
     def machine_readable(self) -> bool:
@@ -316,12 +319,15 @@ def _get_path(row: dict[str, Any], path: str) -> Any:
     return current
 
 
-def select_fields(rows: list[dict[str, Any]], fields: list[str]) -> list[dict[str, Any]]:
+def select_fields(
+    rows: list[dict[str, Any]], fields: list[str], resource: str | None = None
+) -> list[dict[str, Any]]:
     """`--json a,b,c`: keep only the named fields (dotted paths allowed)."""
     wanted = [f.strip() for f in fields if f.strip()]
     if not wanted:
-        raise fields_error(rows)
-    known = set(available_fields(rows))
+        raise fields_error(rows, resource)
+    # A field the schema promises stays valid even when this answer happens to omit it.
+    known = set(available_fields(rows)) | set(static_fields(resource))
     unknown = [f for f in wanted if f.split(".")[0] not in known] if known else []
     if unknown:
         raise YouGileError(
@@ -331,14 +337,42 @@ def select_fields(rows: list[dict[str, Any]], fields: list[str]) -> list[dict[st
     return [{name: _get_path(row, name) for name in wanted} for row in rows]
 
 
-def fields_error(rows: list[dict[str, Any]]) -> YouGileError:
-    """`--json` with no value: list the fields and exit 1, exactly like gh."""
-    names = available_fields(rows)
+def fields_error(rows: list[dict[str, Any]], resource: str | None = None) -> YouGileError:
+    """`--json` with no value: list the fields and exit 1, exactly like gh.
+
+    The static schema is what makes the answer available before the first request;
+    the rows add whatever the server returned beyond it.
+    """
+    names = set(static_fields(resource)) | set(available_fields(rows))
     listing = ", ".join(sorted(names)) if names else "нет данных для определения полей"
     return YouGileError(
         "укажите поля через запятую: --json ПОЛЕ1,ПОЛЕ2",
         hint=f"доступные поля: {listing}",
     )
+
+
+def apply_json_fields(
+    opts: OutputOptions,
+    value: str | None,
+    resource: str | None = None,
+    *,
+    rows: list[dict[str, Any]] | None = None,
+) -> None:
+    """Fold one `--json` value into `opts` — the single place the flag is parsed.
+
+    A bare `--json` asks for names, not for data, and is answered as completely as it
+    can be without paying for a request: from the static schema, from `rows` when the
+    command composed them locally, or from both. With neither at hand — and no rows
+    is the same as no rows yet — the empty selection travels on and `render` answers
+    from the rows the command does fetch, exactly as it did before the schema existed.
+    """
+    if value is None:
+        return
+    opts.resource = resource
+    selected = [name.strip() for name in value.split(",") if name.strip()]
+    if not selected and (rows or static_fields(resource)):
+        raise fields_error(rows or [], resource)
+    opts.json_fields = selected
 
 
 def run_jq(data: Any, expr: str) -> str:
@@ -489,7 +523,7 @@ def render(
     fmt = options.fmt
 
     if options.json_fields is not None:
-        payload = select_fields(as_rows(data), options.json_fields)
+        payload = select_fields(as_rows(data), options.json_fields, options.resource)
         fmt = OutputFormat.JSON
 
     if options.jq:

@@ -17,7 +17,7 @@ import typer
 from ..client import YouGileClient
 from ..context import AppContext, ctx_client, emit, get_ctx
 from ..errors import CancelledError, ValidationError, single_name
-from ..output import is_tty, target_label
+from ..output import apply_json_fields, is_tty, target_label
 from ..resolve import parse_kv_options, resolve_one, resolve_project_id, resolve_user_id
 
 __all__ = ["app", "role_app"]
@@ -50,14 +50,14 @@ def _apply_output(
     json_fields: str | None = None,
     jq: str | None = None,
     full_ids: bool = False,
+    resource: str | None = "project",
 ) -> None:
     """Fold the per-command output flags into the context's output options.
 
     `-o/--output` stays a root flag: cli.hoist_root_flags lets it trail any
     subcommand, so redeclaring it here would only split the help text.
     """
-    if json_fields is not None:
-        app_ctx.out.json_fields = [name.strip() for name in json_fields.split(",") if name.strip()]
+    apply_json_fields(app_ctx.out, json_fields, resource)
     if jq:
         app_ctx.out.jq = jq
     if full_ids:
@@ -296,7 +296,9 @@ def list_roles(
 ) -> None:
     """Список ролей проекта."""
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields=json_fields, jq=jq, full_ids=full_ids)
+    _apply_output(
+        app_ctx, json_fields=json_fields, jq=jq, full_ids=full_ids, resource="project-role"
+    )
     client = ctx_client(ctx)
     project_id = resolve_project_id(client, project)
     items = client.collect(_roles_path(project_id), {"name": search}, max_items=_max_items(limit))
@@ -314,7 +316,9 @@ def view_role(
 ) -> None:
     """Показать роль вместе с деревом прав."""
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields=json_fields, jq=jq, full_ids=full_ids)
+    _apply_output(
+        app_ctx, json_fields=json_fields, jq=jq, full_ids=full_ids, resource="project-role"
+    )
     client = ctx_client(ctx)
     project_id = resolve_project_id(client, project)
     role_id = _resolve_role_id(client, project_id, role)
@@ -343,7 +347,7 @@ def create_role(
 ) -> None:
     """Создать роль проекта."""
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields=json_fields, jq=jq)
+    _apply_output(app_ctx, json_fields=json_fields, jq=jq, resource="project-role")
     client = ctx_client(ctx)
     project_id = resolve_project_id(client, project)
     body = {
@@ -373,7 +377,7 @@ def edit_role(
 ) -> None:
     """Изменить роль проекта."""
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields=json_fields, jq=jq)
+    _apply_output(app_ctx, json_fields=json_fields, jq=jq, resource="project-role")
     client = ctx_client(ctx)
     project_id = resolve_project_id(client, project)
     role_id = _resolve_role_id(client, project_id, role)
@@ -401,7 +405,7 @@ def delete_role(
 ) -> None:
     """Удалить роль проекта."""
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields=json_fields, jq=jq)
+    _apply_output(app_ctx, json_fields=json_fields, jq=jq, resource="project-role")
     client = ctx_client(ctx)
     project_id = resolve_project_id(client, project)
     role_id = _resolve_role_id(client, project_id, role)

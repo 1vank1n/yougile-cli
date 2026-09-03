@@ -26,7 +26,7 @@ from ..errors import (
     not_specified_message,
     resource_words,
 )
-from ..output import is_tty, shorten_id
+from ..output import apply_json_fields, is_tty, shorten_id
 from ..resolve import is_uuid, resolve_board_id, resolve_column_id, resolve_project_id
 
 __all__ = ["app"]
@@ -134,14 +134,14 @@ def _apply_output(
     json_fields: str | None = None,
     jq: str | None = None,
     full_ids: bool = False,
+    resource: str | None = "webhook",
 ) -> None:
     """Fold the per-command output flags into the context's output options.
 
     `-o/--output` stays a root flag: cli.hoist_root_flags lets it trail any
     subcommand, so redeclaring it here would only split the help text.
     """
-    if json_fields is not None:
-        app_ctx.out.json_fields = [name.strip() for name in json_fields.split(",") if name.strip()]
+    apply_json_fields(app_ctx.out, json_fields, resource)
     if jq:
         app_ctx.out.jq = jq
     if full_ids:
@@ -402,7 +402,7 @@ def list_events(
 ) -> None:
     """Известные события, на которые можно подписаться."""
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields=json_fields, jq=jq)
+    _apply_output(app_ctx, json_fields=json_fields, jq=jq, resource="webhook-event")
     emit(app_ctx, list(EVENT_ROWS), columns=["event", "description"])
     if not app_ctx.out.machine_readable and not app_ctx.quiet:
         app_ctx.err_console.print(EVENTS_NOTE)

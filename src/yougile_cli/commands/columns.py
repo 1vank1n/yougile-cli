@@ -15,7 +15,7 @@ import typer
 from ..client import YouGileClient
 from ..context import AppContext, get_ctx
 from ..errors import CancelledError, ValidationError, single_name
-from ..output import as_rows, fields_error, is_tty, target_label
+from ..output import apply_json_fields, is_tty, target_label
 from ..resolve import resolve_board_id, resolve_column_id
 
 __all__ = ["app"]
@@ -90,11 +90,11 @@ def _prepare(
     json_fields: str | None = None,
     jq: str | None = None,
     limit: int | None = None,
+    resource: str | None = "column",
 ) -> AppContext:
     """Fold the per-command output flags into the shared output options."""
     app_ctx = get_ctx(ctx)
-    if json_fields is not None:
-        app_ctx.out.json_fields = [name.strip() for name in json_fields.split(",") if name.strip()]
+    apply_json_fields(app_ctx.out, json_fields, resource)
     if jq:
         app_ctx.out.jq = jq
     if limit is not None:
@@ -103,8 +103,6 @@ def _prepare(
 
 
 def _emit(app_ctx: AppContext, data: Any, columns: list[str] | None = None) -> None:
-    if app_ctx.out.json_fields is not None and not app_ctx.out.json_fields:
-        raise fields_error(as_rows(data))
     app_ctx.emit(data, columns)
 
 

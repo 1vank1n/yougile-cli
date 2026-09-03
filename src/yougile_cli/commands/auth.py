@@ -39,7 +39,7 @@ from ..errors import (
     ResolveError,
     ValidationError,
 )
-from ..output import OutputFormat, is_tty, sanitize_terminal_text
+from ..output import OutputFormat, apply_json_fields, is_tty, sanitize_terminal_text
 
 __all__ = ["app", "keys_app"]
 
@@ -101,10 +101,10 @@ def _apply_output(
     jq: str | None = None,
     limit: int | None = None,
     full_ids: bool = False,
+    resource: str | None = "api-key",
 ) -> None:
     """Fold per-command output flags into the invocation-wide OutputOptions."""
-    if json_fields is not None:
-        app_ctx.out.json_fields = [part for part in json_fields.split(",") if part.strip()]
+    apply_json_fields(app_ctx.out, json_fields, resource)
     if jq:
         app_ctx.out.jq = jq
     if limit is not None:

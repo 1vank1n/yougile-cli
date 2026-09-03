@@ -34,8 +34,8 @@ from ..context import AppContext, emit, get_ctx
 from ..editor import open_editor
 from ..errors import CancelledError, ValidationError, YouGileError, not_specified_message
 from ..htmltext import html_to_text
+from ..output import apply_json_fields, sanitize_terminal_text, shorten_id, target_label
 from ..output import is_tty as _is_tty
-from ..output import sanitize_terminal_text, shorten_id, target_label
 from ..resolve import (
     parse_kv_options,
     resolve_board_id,
@@ -167,10 +167,10 @@ def _apply_output(
     jq: str | None = None,
     limit: int | None = None,
     full_ids: bool = False,
+    resource: str | None = "task",
 ) -> None:
     """Per-command output flags win over the global ones set in `cli.py`."""
-    if json_fields is not None:
-        app_ctx.out.json_fields = json_fields.split(",")
+    apply_json_fields(app_ctx.out, json_fields, resource)
     if jq:
         app_ctx.out.jq = jq
     if limit is not None:
@@ -849,7 +849,7 @@ def task_attachments(
 ) -> None:
     """Файлы, приложенные к задаче в описании и в чате."""
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields=json_fields, jq=jq)
+    _apply_output(app_ctx, json_fields=json_fields, jq=jq, resource="task-attachment")
     client = app_ctx.client()
     data = _fetch_task(client, task)
     items = _collect_attachments(client, data, source=source)
@@ -1429,7 +1429,7 @@ def comment_task(
 ) -> None:
     """Написать в чат задачи."""
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields=json_fields, jq=jq)
+    _apply_output(app_ctx, json_fields=json_fields, jq=jq, resource="chat-message")
     client = app_ctx.client()
     task_id = resolve_task_id(client, task)
 
@@ -1490,7 +1490,7 @@ def list_subscribers(
 ) -> None:
     """Показать участников чата задачи."""
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields=json_fields, jq=jq, full_ids=full_ids)
+    _apply_output(app_ctx, json_fields=json_fields, jq=jq, full_ids=full_ids, resource=None)
     client = app_ctx.client()
     task_id = resolve_task_id(client, task)
     emit(app_ctx, [{"id": item} for item in _current_subscribers(client, task_id)], ["id"])

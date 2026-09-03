@@ -10,7 +10,7 @@ import typer
 from ..client import YouGileClient
 from ..context import emit, get_client, get_ctx
 from ..errors import AmbiguousNameError, ResolveError, ValidationError, single_name
-from ..output import as_rows, fields_error, humanize_timestamp, is_tty
+from ..output import apply_json_fields, humanize_timestamp, is_tty
 from ..resolve import is_uuid, resolve_board_id, resolve_one
 from .tasks import parse_datetime_to_ms
 
@@ -102,16 +102,10 @@ def _emit(
     data: Any,
     *,
     columns: list[str] | None = None,
-    json_fields: str | None = None,
     jq: str | None = None,
 ) -> None:
-    """Apply the per-command output flags, then hand the data to the renderer."""
+    """Hand the data to the renderer; `--json` was settled before the request."""
     app_ctx = get_ctx(ctx)
-    if json_fields is not None:
-        fields = [item.strip() for item in json_fields.split(",") if item.strip()]
-        if not fields:
-            raise fields_error(as_rows(data))
-        app_ctx.out.json_fields = fields
     if jq:
         app_ctx.out.jq = jq
     emit(app_ctx, data, columns)
@@ -303,7 +297,8 @@ sprint_app.add_typer(sprint_state_app, name="state")
 def string_icons(ctx: typer.Context, json_fields: JsonOpt = None, jq: JqOpt = None) -> None:
     """Показать допустимые иконки строкового стикера."""
     rows = [{"icon": icon} for icon in STRING_STICKER_ICONS if icon]
-    _emit(ctx, rows, columns=["icon"], json_fields=json_fields, jq=jq)
+    apply_json_fields(get_ctx(ctx).out, json_fields, None, rows=rows)
+    _emit(ctx, rows, columns=["icon"], jq=jq)
 
 
 @string_app.command("list")
@@ -317,6 +312,7 @@ def string_list(
     jq: JqOpt = None,
 ) -> None:
     """Список строковых стикеров."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-string")
     client = get_client(ctx)
     rows = _list_stickers(
         client,
@@ -326,7 +322,7 @@ def string_list(
         include_deleted=include_deleted,
         limit=limit,
     )
-    _emit(ctx, rows, columns=STRING_LIST_COLUMNS, json_fields=json_fields, jq=jq)
+    _emit(ctx, rows, columns=STRING_LIST_COLUMNS, jq=jq)
 
 
 @string_app.command("view")
@@ -337,9 +333,10 @@ def string_view(
     jq: JqOpt = None,
 ) -> None:
     """Показать строковый стикер."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-string")
     client = get_client(ctx)
     data = client.get(f"{STRING_PATH}/{_string_id(client, sticker)}")
-    _emit(ctx, data, json_fields=json_fields, jq=jq)
+    _emit(ctx, data, jq=jq)
 
 
 @string_app.command("create")
@@ -361,6 +358,7 @@ def string_create(
     jq: JqOpt = None,
 ) -> None:
     """Создать строковый стикер."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-string")
     client = get_client(ctx)
     payload: dict[str, Any] = {
         "name": single_name(
@@ -375,7 +373,7 @@ def string_create(
         payload["icon"] = icon
     if state:
         payload["states"] = [_parse_string_state(item) for item in state]
-    _emit(ctx, client.post(STRING_PATH, payload), json_fields=json_fields, jq=jq)
+    _emit(ctx, client.post(STRING_PATH, payload), jq=jq)
 
 
 @string_app.command("edit")
@@ -388,6 +386,7 @@ def string_edit(
     jq: JqOpt = None,
 ) -> None:
     """Изменить строковый стикер."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-string")
     if name is None and icon is None:
         raise ValidationError("Нечего менять.", hint="Укажите --name и/или --icon.")
     client = get_client(ctx)
@@ -397,7 +396,7 @@ def string_edit(
         payload["name"] = name
     if icon is not None:
         payload["icon"] = icon
-    _emit(ctx, client.put(f"{STRING_PATH}/{sticker_id}", payload), json_fields=json_fields, jq=jq)
+    _emit(ctx, client.put(f"{STRING_PATH}/{sticker_id}", payload), jq=jq)
 
 
 @string_app.command("delete")
@@ -409,12 +408,13 @@ def string_delete(
     jq: JqOpt = None,
 ) -> None:
     """Удалить строковый стикер."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-string")
     client = get_client(ctx)
     sticker_id = _string_id(client, sticker)
     _confirm(ctx, f"Удалить строковый стикер {sticker_id}?", yes)
     # The API has no DELETE for stickers: deletion is a PUT with deleted=true.
     data = client.put(f"{STRING_PATH}/{sticker_id}", {"deleted": True})
-    _emit(ctx, data, json_fields=json_fields, jq=jq)
+    _emit(ctx, data, jq=jq)
 
 
 @string_state_app.command("list")
@@ -426,11 +426,12 @@ def string_state_list(
     jq: JqOpt = None,
 ) -> None:
     """Список состояний строкового стикера."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-string-state")
     client = get_client(ctx)
     sticker_id = _string_id(client, sticker)
     data = client.get(f"{STRING_PATH}/{sticker_id}")
     rows = _states(data, include_deleted=include_deleted)
-    _emit(ctx, rows, columns=STRING_STATE_COLUMNS, json_fields=json_fields, jq=jq)
+    _emit(ctx, rows, columns=STRING_STATE_COLUMNS, jq=jq)
 
 
 @string_state_app.command("add")
@@ -443,13 +444,14 @@ def string_state_add(
     jq: JqOpt = None,
 ) -> None:
     """Добавить состояние строковому стикеру."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-string-state")
     client = get_client(ctx)
     sticker_id = _string_id(client, sticker)
     payload: dict[str, Any] = {"name": name}
     if color is not None:
         payload["color"] = color
     data = client.post(f"{STRING_PATH}/{sticker_id}/states", payload)
-    _emit(ctx, data, json_fields=json_fields, jq=jq)
+    _emit(ctx, data, jq=jq)
 
 
 @string_state_app.command("edit")
@@ -463,6 +465,7 @@ def string_state_edit(
     jq: JqOpt = None,
 ) -> None:
     """Изменить состояние строкового стикера."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-string-state")
     if name is None and color is None:
         raise ValidationError("Нечего менять.", hint="Укажите --name и/или --color.")
     client = get_client(ctx)
@@ -474,7 +477,7 @@ def string_state_edit(
     if color is not None:
         payload["color"] = color
     data = client.put(f"{STRING_PATH}/{sticker_id}/states/{state_id}", payload)
-    _emit(ctx, data, json_fields=json_fields, jq=jq)
+    _emit(ctx, data, jq=jq)
 
 
 @string_state_app.command("delete")
@@ -487,12 +490,13 @@ def string_state_delete(
     jq: JqOpt = None,
 ) -> None:
     """Удалить состояние строкового стикера."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-string-state")
     client = get_client(ctx)
     sticker_id = _string_id(client, sticker)
     state_id = _state_id(client, STRING_PATH, sticker_id, state)
     _confirm(ctx, f"Удалить состояние {state_id}?", yes)
     data = client.put(f"{STRING_PATH}/{sticker_id}/states/{state_id}", {"deleted": True})
-    _emit(ctx, data, json_fields=json_fields, jq=jq)
+    _emit(ctx, data, jq=jq)
 
 
 # --------------------------------------------------------------------------- sprint
@@ -509,6 +513,7 @@ def sprint_list(
     jq: JqOpt = None,
 ) -> None:
     """Список стикеров-спринтов."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-sprint")
     client = get_client(ctx)
     rows = _list_stickers(
         client,
@@ -518,7 +523,7 @@ def sprint_list(
         include_deleted=include_deleted,
         limit=limit,
     )
-    _emit(ctx, rows, columns=SPRINT_LIST_COLUMNS, json_fields=json_fields, jq=jq)
+    _emit(ctx, rows, columns=SPRINT_LIST_COLUMNS, jq=jq)
 
 
 @sprint_app.command("view")
@@ -529,9 +534,10 @@ def sprint_view(
     jq: JqOpt = None,
 ) -> None:
     """Показать стикер-спринт."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-sprint")
     client = get_client(ctx)
     data = client.get(f"{SPRINT_PATH}/{_sprint_id(client, sticker)}")
-    _emit(ctx, data, json_fields=json_fields, jq=jq)
+    _emit(ctx, data, jq=jq)
 
 
 @sprint_app.command("create")
@@ -555,6 +561,7 @@ def sprint_create(
     jq: JqOpt = None,
 ) -> None:
     """Создать стикер-спринт."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-sprint")
     client = get_client(ctx)
     payload: dict[str, Any] = {
         "name": single_name(
@@ -567,7 +574,7 @@ def sprint_create(
     }
     if state:
         payload["states"] = [_parse_sprint_state(item) for item in state]
-    _emit(ctx, client.post(SPRINT_PATH, payload), json_fields=json_fields, jq=jq)
+    _emit(ctx, client.post(SPRINT_PATH, payload), jq=jq)
 
 
 @sprint_app.command("edit")
@@ -579,10 +586,11 @@ def sprint_edit(
     jq: JqOpt = None,
 ) -> None:
     """Изменить стикер-спринт."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-sprint")
     client = get_client(ctx)
     sticker_id = _sprint_id(client, sticker)
     data = client.put(f"{SPRINT_PATH}/{sticker_id}", {"name": name})
-    _emit(ctx, data, json_fields=json_fields, jq=jq)
+    _emit(ctx, data, jq=jq)
 
 
 @sprint_app.command("delete")
@@ -594,12 +602,13 @@ def sprint_delete(
     jq: JqOpt = None,
 ) -> None:
     """Удалить стикер-спринт."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-sprint")
     client = get_client(ctx)
     sticker_id = _sprint_id(client, sticker)
     _confirm(ctx, f"Удалить стикер-спринт {sticker_id}?", yes)
     # The API has no DELETE for stickers: deletion is a PUT with deleted=true.
     data = client.put(f"{SPRINT_PATH}/{sticker_id}", {"deleted": True})
-    _emit(ctx, data, json_fields=json_fields, jq=jq)
+    _emit(ctx, data, jq=jq)
 
 
 @sprint_state_app.command("list")
@@ -611,6 +620,7 @@ def sprint_state_list(
     jq: JqOpt = None,
 ) -> None:
     """Список состояний стикера-спринта."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-sprint-state")
     app_ctx = get_ctx(ctx)
     client = get_client(ctx)
     sticker_id = _sprint_id(client, sticker)
@@ -618,7 +628,7 @@ def sprint_state_list(
     rows = _states(data, include_deleted=include_deleted)
     if json_fields is None and not jq and not app_ctx.out.machine_readable:
         rows = _sprint_state_rows(rows)
-    _emit(ctx, rows, columns=SPRINT_STATE_COLUMNS, json_fields=json_fields, jq=jq)
+    _emit(ctx, rows, columns=SPRINT_STATE_COLUMNS, jq=jq)
 
 
 @sprint_state_app.command("add")
@@ -632,6 +642,7 @@ def sprint_state_add(
     jq: JqOpt = None,
 ) -> None:
     """Добавить состояние стикеру-спринту."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-sprint-state")
     client = get_client(ctx)
     sticker_id = _sprint_id(client, sticker)
     payload: dict[str, Any] = {"name": name}
@@ -640,7 +651,7 @@ def sprint_state_add(
     if end is not None:
         payload["end"] = parse_datetime_to_ms(end)
     data = client.post(f"{SPRINT_PATH}/{sticker_id}/states", payload)
-    _emit(ctx, data, json_fields=json_fields, jq=jq)
+    _emit(ctx, data, jq=jq)
 
 
 @sprint_state_app.command("edit")
@@ -655,6 +666,7 @@ def sprint_state_edit(
     jq: JqOpt = None,
 ) -> None:
     """Изменить состояние стикера-спринта."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-sprint-state")
     if name is None and begin is None and end is None:
         raise ValidationError("Нечего менять.", hint="Укажите --name, --begin и/или --end.")
     client = get_client(ctx)
@@ -668,7 +680,7 @@ def sprint_state_edit(
     if end is not None:
         payload["end"] = parse_datetime_to_ms(end)
     data = client.put(f"{SPRINT_PATH}/{sticker_id}/states/{state_id}", payload)
-    _emit(ctx, data, json_fields=json_fields, jq=jq)
+    _emit(ctx, data, jq=jq)
 
 
 @sprint_state_app.command("delete")
@@ -681,9 +693,10 @@ def sprint_state_delete(
     jq: JqOpt = None,
 ) -> None:
     """Удалить состояние стикера-спринта."""
+    apply_json_fields(get_ctx(ctx).out, json_fields, "sticker-sprint-state")
     client = get_client(ctx)
     sticker_id = _sprint_id(client, sticker)
     state_id = _state_id(client, SPRINT_PATH, sticker_id, state)
     _confirm(ctx, f"Удалить состояние {state_id}?", yes)
     data = client.put(f"{SPRINT_PATH}/{sticker_id}/states/{state_id}", {"deleted": True})
-    _emit(ctx, data, json_fields=json_fields, jq=jq)
+    _emit(ctx, data, jq=jq)

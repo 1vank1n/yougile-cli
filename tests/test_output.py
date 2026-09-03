@@ -145,10 +145,34 @@ def test_select_fields_rejects_unknown_field() -> None:
     assert "title" in str(excinfo.value.hint)
 
 
+def test_select_fields_keeps_a_field_the_schema_promises_but_this_answer_omits() -> None:
+    """Перечень обещал `columnId` — значит, запрос этого поля не может быть ошибкой."""
+    rows = [{"id": "11111111-1111-4111-8111-111111111111", "title": "Первая"}]
+    assert select_fields(rows, ["title", "columnId"], "task") == [
+        {"title": "Первая", "columnId": None}
+    ]
+
+
 def test_fields_error_lists_available_fields() -> None:
     error = fields_error(ROWS)
     assert error.exit_code == 1
     assert "completed" in str(error.hint)
+
+
+def test_fields_error_without_rows_falls_back_to_the_static_schema() -> None:
+    hint = str(fields_error([], "task").hint)
+    assert "columnId" in hint
+    assert "нет данных" not in hint
+
+
+def test_fields_error_unions_the_static_schema_with_the_fields_that_came() -> None:
+    hint = str(fields_error([{"собственноеПоле": 1}], "task").hint)
+    assert "собственноеПоле" in hint
+    assert "columnId" in hint
+
+
+def test_fields_error_keeps_the_old_message_when_nothing_is_known() -> None:
+    assert "нет данных для определения полей" in str(fields_error([], "нет-такого").hint)
 
 
 def test_render_json_fields_forces_json(capsys: pytest.CaptureFixture[str]) -> None:

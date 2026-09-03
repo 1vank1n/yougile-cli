@@ -12,7 +12,14 @@ from rich.tree import Tree
 from ..client import YouGileClient
 from ..context import AppContext, get_ctx
 from ..errors import CancelledError, ValidationError, single_name
-from ..output import OutputFormat, is_tty, sanitize_terminal_text, shorten_id, target_label
+from ..output import (
+    OutputFormat,
+    apply_json_fields,
+    is_tty,
+    sanitize_terminal_text,
+    shorten_id,
+    target_label,
+)
 from ..resolve import resolve_board_id, resolve_project_id
 
 __all__ = ["app"]
@@ -56,10 +63,14 @@ _INCLUDE_DELETED_OPT = typer.Option(False, "--include-deleted", help="Показ
 _YES_OPT = typer.Option(False, "--yes", "-y", help="Не спрашивать подтверждение")
 
 
-def _apply_output(app_ctx: AppContext, json_fields: str | None, jq: str | None) -> None:
+def _apply_output(
+    app_ctx: AppContext,
+    json_fields: str | None,
+    jq: str | None,
+    resource: str | None = "board",
+) -> None:
     """`--json ПОЛЯ` и `--jq` живут на команде, а не на корневом приложении."""
-    if json_fields is not None:
-        app_ctx.out.json_fields = [name.strip() for name in json_fields.split(",") if name.strip()]
+    apply_json_fields(app_ctx.out, json_fields, resource)
     if jq:
         app_ctx.out.jq = jq
 

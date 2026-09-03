@@ -239,6 +239,31 @@ def test_json_without_fields_lists_available_fields(dept, api, paged) -> None:
     assert "parentId" in str(result.exception.hint)
 
 
+def test_json_without_fields_answers_on_an_empty_list_without_asking_the_server(
+    dept, api, paged
+) -> None:
+    route = api.get(PATH).respond(json=paged([]))
+    result = dept(["list", "--json", ""])
+    assert result.code == 1
+    assert "parentId" in str(result.exception.hint)
+    assert not route.called
+
+
+def test_json_without_fields_answers_without_a_client(runner, api) -> None:
+    """Перечень полей — вопрос об именах: ни ключа, ни запроса для ответа не нужно."""
+    cli = typer.Typer()
+    cli.add_typer(department_app, name="department")
+
+    @cli.callback()
+    def _root(ctx: typer.Context) -> None:
+        ctx.obj = AppContext(out=OutputOptions(fmt=OutputFormat.TABLE))
+
+    result = runner.invoke(cli, ["department", "list", "--json", ""])
+    assert exit_code_for(result.exception) == 1
+    assert "parentId" in str(result.exception.hint)
+    assert not api.calls
+
+
 # --------------------------------------------------------------------------- errors
 
 

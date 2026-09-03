@@ -12,7 +12,14 @@ from rich.tree import Tree
 from ..client import YouGileClient
 from ..context import AppContext, get_ctx
 from ..errors import CancelledError, ResolveError, ValidationError, single_name
-from ..output import OutputFormat, is_tty, sanitize_terminal_text, shorten_id, target_label
+from ..output import (
+    OutputFormat,
+    apply_json_fields,
+    is_tty,
+    sanitize_terminal_text,
+    shorten_id,
+    target_label,
+)
 from ..resolve import parse_kv_options, resolve_one, resolve_user_id
 
 __all__ = ["app", "resolve_department_id"]
@@ -74,12 +81,12 @@ def _prepare(
     ctx: typer.Context,
     json_fields: str | None = None,
     jq: str | None = None,
+    resource: str | None = "department",
 ) -> AppContext:
     """Apply the per-command output flags on top of the global ones, like gh does."""
     app_ctx = get_ctx(ctx)
     if json_fields is not None:
-        # An empty `--json` makes output.select_fields list the available fields (exit 1).
-        app_ctx.out.json_fields = [name.strip() for name in json_fields.split(",") if name.strip()]
+        apply_json_fields(app_ctx.out, json_fields, resource)
         app_ctx.out.fmt = OutputFormat.JSON
     if jq:
         app_ctx.out.jq = jq

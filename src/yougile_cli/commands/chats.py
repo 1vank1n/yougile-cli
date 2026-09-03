@@ -25,7 +25,13 @@ from ..errors import (
     single_name,
 )
 from ..htmltext import html_to_text
-from ..output import OutputFormat, is_tty, sanitize_terminal_text, target_label
+from ..output import (
+    OutputFormat,
+    apply_json_fields,
+    is_tty,
+    sanitize_terminal_text,
+    target_label,
+)
 from ..resolve import extract_id_from_url, is_uuid, resolve_one, resolve_task_id, resolve_user_id
 
 __all__ = ["app", "message_app"]
@@ -120,10 +126,14 @@ _NOTIFY_OPT = typer.Option(
 )
 
 
-def _apply_output(app_ctx: AppContext, json_fields: str | None, jq: str | None) -> None:
+def _apply_output(
+    app_ctx: AppContext,
+    json_fields: str | None,
+    jq: str | None,
+    resource: str | None = "chat",
+) -> None:
     """`--json ПОЛЯ` и `--jq` живут на команде, а не на корневом приложении."""
-    if json_fields is not None:
-        app_ctx.out.json_fields = [name.strip() for name in json_fields.split(",") if name.strip()]
+    apply_json_fields(app_ctx.out, json_fields, resource)
     if jq:
         app_ctx.out.jq = jq
 
@@ -490,7 +500,7 @@ def send_message(
     jq: str | None = _JQ_OPT,
 ) -> None:
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields, jq)
+    _apply_output(app_ctx, json_fields, jq, "chat-message")
     text = _read_body(body, body_file, editor, app_ctx=app_ctx)
 
     client = app_ctx.client()
@@ -530,7 +540,7 @@ def list_messages(
     jq: str | None = _JQ_OPT,
 ) -> None:
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields, jq)
+    _apply_output(app_ctx, json_fields, jq, "chat-message")
     client = app_ctx.client()
     chat_id = _chat_target_id(client, chat)
 
@@ -566,7 +576,7 @@ def send_typing(
     jq: str | None = _JQ_OPT,
 ) -> None:
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields, jq)
+    _apply_output(app_ctx, json_fields, jq, None)
     client = app_ctx.client()
     chat_id = _chat_target_id(client, chat)
     app_ctx.emit(client.post(f"/api-v2/chats/{chat_id}/typing"))
@@ -581,7 +591,7 @@ def view_message(
     jq: str | None = _JQ_OPT,
 ) -> None:
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields, jq)
+    _apply_output(app_ctx, json_fields, jq, "chat-message")
     client = app_ctx.client()
     chat_id = _chat_target_id(client, chat)
     app_ctx.emit(client.get(f"{_messages_path(chat_id)}/{message_id}"))
@@ -602,7 +612,7 @@ def edit_message(
     jq: str | None = _JQ_OPT,
 ) -> None:
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields, jq)
+    _apply_output(app_ctx, json_fields, jq, "chat-message")
     if label is None and react is None:
         raise ValidationError("Нечего менять.", hint="Укажите --label или --react.")
     if react is not None and react not in REACTIONS:
@@ -627,7 +637,7 @@ def delete_message(
     jq: str | None = _JQ_OPT,
 ) -> None:
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields, jq)
+    _apply_output(app_ctx, json_fields, jq, "chat-message")
     client = app_ctx.client()
     chat_id = _chat_target_id(client, chat)
     _confirm(app_ctx, f"Удалить сообщение {message_id}?", yes)

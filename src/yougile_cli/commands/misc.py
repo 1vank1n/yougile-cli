@@ -42,7 +42,7 @@ from ..errors import (
     not_specified_message,
     single_name,
 )
-from ..output import OutputFormat, is_tty, sanitize_terminal_text
+from ..output import OutputFormat, apply_json_fields, is_tty, sanitize_terminal_text
 from ..resolve import (
     parse_kv_options,
     parse_task_url,
@@ -115,10 +115,15 @@ _COMPANY_OPT = typer.Option(
 )
 
 
-def _apply_output(app_ctx: AppContext, json_fields: str | None, jq: str | None) -> None:
+def _apply_output(
+    app_ctx: AppContext,
+    json_fields: str | None,
+    jq: str | None,
+    resource: str | None = None,
+    rows: list[dict[str, Any]] | None = None,
+) -> None:
     """`--json ПОЛЯ` и `--jq` живут на команде, а не на корневом приложении."""
-    if json_fields is not None:
-        app_ctx.out.json_fields = [name.strip() for name in json_fields.split(",") if name.strip()]
+    apply_json_fields(app_ctx.out, json_fields, resource, rows=rows)
     if jq:
         app_ctx.out.jq = jq
 
@@ -176,7 +181,7 @@ def view_company(
     jq: str | None = _JQ_OPT,
 ) -> None:
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields, jq)
+    _apply_output(app_ctx, json_fields, jq, "company")
     app_ctx.emit(app_ctx.client().get(_company_path(company_id)))
 
 
@@ -202,7 +207,7 @@ def edit_company(
     jq: str | None = _JQ_OPT,
 ) -> None:
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields, jq)
+    _apply_output(app_ctx, json_fields, jq, "company")
     extra = parse_kv_options(list(api_data or []))
     body: dict[str, Any] = {"title": title, "apiData": extra or None, "deleted": deleted}
     if all(value is None for value in body.values()):
@@ -423,8 +428,10 @@ def config_list(
     jq: str | None = _JQ_OPT,
 ) -> None:
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields, jq)
-    app_ctx.emit(list_settings())
+    # The aliases live in the same file, so this answer knows more than the schema does.
+    settings = list_settings()
+    _apply_output(app_ctx, json_fields, jq, "setting", rows=[dict(settings)])
+    app_ctx.emit(settings)
 
 
 def _cache_entries(cache: Path) -> int:
@@ -441,7 +448,7 @@ def config_clear_cache(
     jq: str | None = _JQ_OPT,
 ) -> None:
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields, jq)
+    _apply_output(app_ctx, json_fields, jq, "cache")
     cache = cache_dir()
     entries = _cache_entries(cache)
     removed = cache.is_dir()
@@ -519,7 +526,7 @@ def alias_list(
     jq: str | None = _JQ_OPT,
 ) -> None:
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields, jq)
+    _apply_output(app_ctx, json_fields, jq, "alias")
     rows = [{"name": name, "expansion": value} for name, value in sorted(list_aliases().items())]
     app_ctx.emit(rows, columns=["name", "expansion"])
 
@@ -693,7 +700,7 @@ def status_cmd(
 ) -> None:
     """Мои незакрытые задачи, сгруппированные по доскам."""
     app_ctx = get_ctx(ctx)
-    _apply_output(app_ctx, json_fields, jq)
+    _apply_output(app_ctx, json_fields, jq, "assigned-task")
     client = app_ctx.client()
     user_id = resolve_user_id(client, "@me")
 
