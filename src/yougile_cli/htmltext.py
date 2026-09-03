@@ -72,35 +72,35 @@ class _TextExtractor(HTMLParser):
     def __init__(self, *, collapse_newlines: bool = True) -> None:
         super().__init__(convert_charrefs=True)
         self.parts: list[str] = []
-        self._collapse = collapse_newlines
-        self._pending = 0
-        self._bullet = False
-        self._skip_depth = 0
+        self.collapse = collapse_newlines
+        self.pending_breaks = 0
+        self.pending_bullet = False
+        self.skip_depth = 0
 
     def _break(self, level: int) -> None:
-        self._pending = max(self._pending, level)
+        self.pending_breaks = max(self.pending_breaks, level)
 
     def _flush(self) -> None:
-        if self._pending:
+        if self.pending_breaks:
             if self.parts:
-                self.parts.append("\n" * self._pending)
-            self._pending = 0
-        if self._bullet:
+                self.parts.append("\n" * self.pending_breaks)
+            self.pending_breaks = 0
+        if self.pending_bullet:
             self.parts.append(BULLET)
-            self._bullet = False
+            self.pending_bullet = False
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         name = tag.lower()
         if name in _SKIP_TAGS:
-            self._skip_depth += 1
+            self.skip_depth += 1
             return
-        if self._skip_depth:
+        if self.skip_depth:
             return
         if name == "br":
             self._break(1)
         elif name == "li":
             self._break(1)
-            self._bullet = True
+            self.pending_bullet = True
         elif name in _LINE_TAGS:
             self._break(1)
         elif name in _BLOCK_TAGS:
@@ -112,9 +112,9 @@ class _TextExtractor(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         name = tag.lower()
         if name in _SKIP_TAGS:
-            self._skip_depth = max(0, self._skip_depth - 1)
+            self.skip_depth = max(0, self.skip_depth - 1)
             return
-        if self._skip_depth:
+        if self.skip_depth:
             return
         if name in _LINE_TAGS:
             self._break(1)
@@ -122,16 +122,16 @@ class _TextExtractor(HTMLParser):
             self._break(2)
 
     def handle_data(self, data: str) -> None:
-        if self._skip_depth or not data:
+        if self.skip_depth or not data:
             return
         if not data.strip():
             # Whitespace between block tags is layout, not content.
-            if not self._pending and self.parts:
+            if not self.pending_breaks and self.parts:
                 self.parts.append(" ")
             return
         self._flush()
         # Inside markup a source newline is layout: only tags create real breaks.
-        self.parts.append(_WHITESPACE_RE.sub(" ", data) if self._collapse else data)
+        self.parts.append(_WHITESPACE_RE.sub(" ", data) if self.collapse else data)
 
     def handle_entityref(self, name: str) -> None:  # pragma: no cover - convert_charrefs
         self.handle_data(unescape(f"&{name};"))

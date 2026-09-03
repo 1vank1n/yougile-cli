@@ -69,3 +69,25 @@ def test_looks_like_html() -> None:
     assert looks_like_html("<p>да</p>") is True
     assert looks_like_html("нет 1 < 2") is False
     assert looks_like_html("") is False
+
+
+def test_extractor_does_not_shadow_html_parser_internals() -> None:
+    """`HTMLParser` завёл приватное поле `_pending` в Python 3.12: совпадение имён роняло close()."""
+    from html.parser import HTMLParser
+
+    from yougile_cli.htmltext import _TextExtractor
+
+    inherited = set(vars(HTMLParser()))
+    ours = set(vars(_TextExtractor(collapse_newlines=True))) - inherited
+    assert ours, "у экстрактора должны быть собственные поля"
+    assert [name for name in ours if name.startswith("_")] == []
+
+
+def test_block_structure_survives_a_real_parse() -> None:
+    """Раньше исключение в close() глушилось и текст вырождался в «теги заменены пробелами»."""
+    from yougile_cli.htmltext import _TextExtractor
+
+    parser = _TextExtractor(collapse_newlines=True)
+    parser.feed("<p>Первый абзац</p><p>Второй абзац</p>")
+    parser.close()
+    assert "".join(parser.parts) == "Первый абзац\n\nВторой абзац"
